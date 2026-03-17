@@ -9,8 +9,6 @@ def classificar_letra(dedos, hand):
     anelar = hand.landmark[16]
     minimo = hand.landmark[20]
 
-    polegar = hand.landmark[4]
-
     if dedos == [1, 0, 0, 0, 0]:
 
         if (
@@ -21,5 +19,15 @@ def classificar_letra(dedos, hand):
         ):
 
             return "A"
+
+    if dedos == [1, 1, 1, 1, 1]:
+
+        d1 = distancia(polegar, indicador)
+        d2 = distancia(indicador, minimo)
+
+        print("d1:", d1, "d2:", d2)
+
+        if 0.05 < d1 < 0.30 and d2 < 0.35:
+            return "C"
 
     return ""
