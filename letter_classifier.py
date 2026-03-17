@@ -30,4 +30,12 @@ def classificar_letra(dedos, hand):
         if 0.05 < d1 < 0.30 and d2 < 0.35:
             return "C"
 
+    if dedos[1] == 1 and dedos[2] == 0 and dedos[3] == 0 and dedos[4] == 0:
+
+        d1 = distancia(polegar, medio)
+        d2 = distancia(polegar, anelar)
+
+        if d1 < 0.08 and d2 < 0.10:
+            return "D"
+
     return ""
