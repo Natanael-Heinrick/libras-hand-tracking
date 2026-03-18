@@ -44,4 +44,11 @@ def classificar_letra(dedos, hand):
 
         if d < 0.05:
             return "F"
+
+    if dedos == [1, 1, 0, 0, 0]:
+
+        if indicador.y < hand.landmark[6].y:
+
+            if abs(polegar.x - indicador.x) > 0.05:
+                return "G"
     return ""
