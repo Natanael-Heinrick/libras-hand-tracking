@@ -38,4 +38,10 @@ def classificar_letra(dedos, hand):
         if d1 < 0.08 and d2 < 0.10:
             return "D"
 
+    if dedos == [0, 0, 1, 1, 1]:
+
+        d = distancia(polegar, indicador)
+
+        if d < 0.05:
+            return "F"
     return ""
