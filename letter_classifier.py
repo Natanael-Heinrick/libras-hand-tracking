@@ -69,4 +69,12 @@ def classificar_letra(dedos, hand):
         if count >= 2:
             return "M"
 
+    if dedos == [0, 0, 0, 1, 1]:
+
+        if sum(dedos) <= 2:
+
+            if polegar.y < indicador.y and polegar.y < medio.y and polegar.y > anelar.y:
+                return "N"
+            
+
     return ""
