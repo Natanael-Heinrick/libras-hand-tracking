@@ -54,4 +54,19 @@ def classificar_letra(dedos, hand):
 
     if dedos[4] == 1 and dedos[1] == 0 and dedos[2] == 0 and dedos[3] == 0:
         return "I"
+
+    if dedos == [0, 0, 0, 0, 0]:
+
+        count = 0
+
+        if polegar.y < indicador.y:
+            count += 1
+        if polegar.y < medio.y:
+            count += 1
+        if polegar.y < anelar.y:
+            count += 1
+
+        if count >= 2:
+            return "M"
+
     return ""
