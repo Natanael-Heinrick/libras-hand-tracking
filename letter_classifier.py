@@ -96,15 +96,20 @@ def classificar_letra(dedos, hand):
         dedos_y = (indicador.y + medio.y + anelar.y) / 3
         dx = abs(polegar.x - indicador.x)
 
-        print("dx:", dx, "polegar.y:", polegar.y, "dedos_y:", dedos_y)
-
-        # ✅ M → polegar escondido (alto + centralizado)
         if polegar.y < dedos_y and dx < 0.03:
             return "M"
 
-        # ✅ S → polegar visível (mais lateral)
         if dx >= 0.03:
             return "S"
+
+    if dedos == [1, 0, 1, 1, 1]:
+
+        dedos_y = (indicador.y + medio.y + anelar.y) / 3
+        dx = abs(polegar.x - indicador.x)
+
+        # polegar dentro da mão (cruzando)
+        if polegar.y > dedos_y and dx < 0.06:
+            return "T"
 
     print("distancia O:", distancia(polegar, indicador))
     return ""
