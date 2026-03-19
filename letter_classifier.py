@@ -96,5 +96,14 @@ def classificar_letra(dedos, hand):
 
         return "A"
 
+    if dedos == [0, 1, 1, 0, 0]:
+
+        if indicador.x > medio.x:
+
+            d = distancia(indicador, medio)
+
+            if d < 0.05:
+                return "R"
+
     print("distancia O:", distancia(polegar, indicador))
     return ""
