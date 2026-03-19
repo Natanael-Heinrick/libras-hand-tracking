@@ -9,16 +9,17 @@ def classificar_letra(dedos, hand):
     anelar = hand.landmark[16]
     minimo = hand.landmark[20]
 
-    if dedos == [1, 0, 0, 0, 0]:
+    # if dedos == [1, 0, 0, 0, 0]:
 
-        if (
-            indicador.y > hand.landmark[6].y
-            and medio.y > hand.landmark[10].y
-            and anelar.y > hand.landmark[14].y
-            and minimo.y > hand.landmark[18].y
-        ):
+    #    if (
+    #        indicador.y > hand.landmark[6].y
+    #        and medio.y > hand.landmark[10].y
+    #        and anelar.y > hand.landmark[14].y
+    #       and minimo.y > hand.landmark[18].y
+    #   ):
 
-            return "A"
+    #       print("distancia O:", distancia(polegar, indicador))
+    #       return "A"
 
     if dedos == [1, 1, 1, 1, 1]:
 
@@ -75,6 +76,16 @@ def classificar_letra(dedos, hand):
 
             if polegar.y < indicador.y and polegar.y < medio.y and polegar.y > anelar.y:
                 return "N"
-            
+
+    if dedos == [1, 0, 0, 0, 0]:
+
+        d = distancia(polegar, indicador)
+
+        print("distancia O:", d)
+
+        if d < 0.07:
+            return "O"
+
+        return "A"
 
     return ""
