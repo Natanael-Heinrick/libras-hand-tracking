@@ -91,15 +91,12 @@ def classificar_letra(dedos, hand):
         dx = abs(indicador.x - medio.x)
         dy = abs(indicador.y - medio.y)
 
-        # 🔴 R → cruzado (diferença vertical maior)
         if d_norm < 0.4 and dy > 0.02:
             return "U"
 
-        # 🟡 U → paralelo (alinhado verticalmente)
         elif d_norm < 0.6 and dy <= 0.02:
             return "R"
 
-        # 🟢 V → aberto
         else:
             return "V"
 
@@ -108,11 +105,23 @@ def classificar_letra(dedos, hand):
         dedos_y = (indicador.y + medio.y + anelar.y) / 3
         dx = abs(polegar.x - indicador.x)
 
-        if polegar.y < dedos_y and dx < 0.03:
-            return "M"
+        d1 = distancia(polegar, indicador)
+        d2 = distancia(polegar, medio)
+        d3 = distancia(polegar, anelar)
 
-        if dx >= 0.03:
+        media = (d1 + d2 + d3) / 3
+
+        # 🔵 S → mais fechado (menor distância)
+        if media < 0.09:
             return "S"
+
+        # 🔴 E → menos fechado (mas ainda próximo)
+        elif media < 0.13 and polegar.y > dedos_y:
+            return "E"
+
+        # 🟡 M → polegar por baixo
+        elif polegar.y < dedos_y and dx < 0.03:
+            return "M"
 
     if dedos == [1, 0, 1, 1, 1]:
 
