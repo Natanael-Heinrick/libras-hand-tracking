@@ -111,15 +111,12 @@ def classificar_letra(dedos, hand):
 
         media = (d1 + d2 + d3) / 3
 
-        # 🔵 S → mais fechado (menor distância)
         if media < 0.09:
             return "S"
 
-        # 🔴 E → menos fechado (mas ainda próximo)
         elif media < 0.13 and polegar.y > dedos_y:
             return "E"
 
-        # 🟡 M → polegar por baixo
         elif polegar.y < dedos_y and dx < 0.03:
             return "M"
 
