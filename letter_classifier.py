@@ -1,13 +1,39 @@
 from hand_geometry import distancia
 
 
-def classificar_letra(dedos, hand):
+def detectar_k(dedos, hand, historico_k):
+
+    polegar = hand.landmark[4]
+    medio = hand.landmark[12]
+
+    if dedos == [1, 1, 1, 0, 0]:
+
+        d = distancia(polegar, medio)
+
+        if 0.15 < d < 0.40:
+            if movimento_para_cima(historico_k):
+                historico_k.clear()
+                return True
+
+    return False
+
+
+def classificar_letra(dedos, hand, historico_k):
 
     polegar = hand.landmark[4]
     indicador = hand.landmark[8]
     medio = hand.landmark[12]
     anelar = hand.landmark[16]
     minimo = hand.landmark[20]
+
+    historico_k.append(indicador.y)
+
+    if len(historico_k) > 10:
+        historico_k.pop(0)
+
+    # prioridade movimento do K >:(
+    if detectar_k(dedos, hand, historico_k):
+        return "K"
 
     # if dedos == [1, 0, 0, 0, 0]:
 
@@ -128,5 +154,20 @@ def classificar_letra(dedos, hand):
         if polegar.y > dedos_y and dx < 0.06:
             return "T"
 
+    indicador = hand.landmark[8]
+
     print("distancia O:", distancia(polegar, indicador))
     return ""
+
+
+def movimento_para_cima(historico):
+    if len(historico) < 3:
+        return False
+
+    subidas = 0
+
+    for i in range(1, len(historico)):
+        if historico[i] < historico[i - 1]:
+            subidas += 1
+
+    return subidas >= len(historico) * 0.7

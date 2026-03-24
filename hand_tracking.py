@@ -19,6 +19,7 @@ palavra = ""
 ultima_letra = ""
 historico_letras = []
 letra_estavel = ""
+historico_k = []
 
 while True:
     ret, frame = camera.read()
@@ -39,7 +40,7 @@ while True:
             altura, largura, _ = frame.shape
 
             dedos = detectar_dedos(hand_landmarks)
-            letra = classificar_letra(dedos, hand_landmarks)
+            letra = classificar_letra(dedos, hand_landmarks, historico_k)
             if letra != "":
                 historico_letras.append(letra)
 
