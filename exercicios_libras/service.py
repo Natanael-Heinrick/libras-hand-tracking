@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import csv
+import random
 from pathlib import Path
 
 
@@ -27,6 +28,7 @@ class ExerciseGameService:
         self.selected_difficulty = "facil"
         self.filtered_words = []
         self.current_index = 0
+        self.random = random.Random()
         self._apply_difficulty_filter(self.selected_difficulty, preserve_target="OI")
 
     def evaluate_word(self, current_word: str) -> dict:
@@ -53,12 +55,10 @@ class ExerciseGameService:
         return self.build_state("")
 
     def next_word(self) -> dict:
-        if self.filtered_words:
-            self.current_index = (self.current_index + 1) % len(self.filtered_words)
-            self._set_current_word(self.current_index)
+        self._advance_word()
         self.completed = False
         self.last_completed_word = ""
-        self.last_feedback = "Nova palavra carregada."
+        self.last_feedback = "Nova palavra aleatoria carregada."
         return self.build_state("")
 
     def set_difficulty(self, difficulty: str) -> dict:
@@ -120,9 +120,17 @@ class ExerciseGameService:
         self.points_per_word = POINTS_BY_DIFFICULTY.get(self.difficulty, 1)
 
     def _advance_word(self):
-        if self.filtered_words:
-            self.current_index = (self.current_index + 1) % len(self.filtered_words)
-            self._set_current_word(self.current_index)
+        if not self.filtered_words:
+            return
+
+        if len(self.filtered_words) == 1:
+            self.current_index = 0
+            self._set_current_word(0)
+            return
+
+        available_indexes = [index for index in range(len(self.filtered_words)) if index != self.current_index]
+        self.current_index = self.random.choice(available_indexes)
+        self._set_current_word(self.current_index)
 
     def _load_words(self) -> list[dict]:
         if not self.csv_path.exists():

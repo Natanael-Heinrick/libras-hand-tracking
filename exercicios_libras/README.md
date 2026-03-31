@@ -32,6 +32,12 @@ Base inicial do modo exercicio via WebSocket.
 - manutencao de pontuacao e nivel entre rodadas
 - opcao de avancar manualmente continua disponivel para teste
 
+## Bloco 5
+
+- selecao aleatoria de palavras dentro da dificuldade atual
+- evita repetir imediatamente a mesma palavra quando houver mais de uma opcao
+- mantem a dificuldade selecionada e o restante do progresso
+
 ## Objetivo do teste
 
 Montar a palavra alvo com os gestos das letras e confirmar cada letra.
