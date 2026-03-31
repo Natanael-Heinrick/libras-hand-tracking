@@ -61,10 +61,10 @@ async def main():
                 )
                 cv2.putText(
                     frame,
-                    f"Pontos: {exercicio.get('pontuacao', 0)} | Nivel: {exercicio.get('nivel', 1)}",
+                    f"Pontos: {exercicio.get('pontuacao', 0)} | Nivel: {exercicio.get('nivel', 1)} | {exercicio.get('dificuldade', '')}",
                     (30, 195),
                     cv2.FONT_HERSHEY_SIMPLEX,
-                    0.8,
+                    0.7,
                     (255, 255, 255),
                     2,
                 )
@@ -79,8 +79,17 @@ async def main():
                 )
                 cv2.putText(
                     frame,
-                    "ESPACO confirma | C limpa | R reinicia | ESC sai",
-                    (30, 275),
+                    f"CSV: {exercicio.get('indice_palavra', 0) + 1}/{exercicio.get('total_palavras', 0)}",
+                    (30, 265),
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    0.7,
+                    (255, 220, 180),
+                    2,
+                )
+                cv2.putText(
+                    frame,
+                    "ESPACO confirma | C limpa | R reinicia | N proxima | ESC sai",
+                    (30, 300),
                     cv2.FONT_HERSHEY_SIMPLEX,
                     0.6,
                     (255, 255, 255),
@@ -91,7 +100,7 @@ async def main():
                     cv2.putText(
                         frame,
                         "ACERTOU!",
-                        (30, 330),
+                        (30, 345),
                         cv2.FONT_HERSHEY_SIMPLEX,
                         1.2,
                         (0, 255, 0),
@@ -116,6 +125,11 @@ async def main():
                     response = json.loads(await websocket.recv())
                     if response.get("tipo") == "erro":
                         raise RuntimeError(response.get("mensagem", "Erro ao reiniciar exercicio"))
+                elif key == ord("n"):
+                    await websocket.send(json.dumps({"acao": "proxima_palavra"}))
+                    response = json.loads(await websocket.recv())
+                    if response.get("tipo") == "erro":
+                        raise RuntimeError(response.get("mensagem", "Erro ao avancar palavra"))
                 elif key == 27:
                     break
     finally:

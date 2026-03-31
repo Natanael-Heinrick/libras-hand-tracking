@@ -9,6 +9,12 @@ Base inicial do modo exercicio via WebSocket.
 - dificuldade inicial: `facil`
 - pontuacao por acerto: `1`
 
+## Bloco 2
+
+- leitura do CSV `dados/palavras_libras_filtrado.csv`
+- carregamento inicial da palavra `OI` quando ela existir no arquivo
+- suporte para avancar manualmente para a proxima palavra durante o teste
+
 ## Objetivo do teste
 
-Montar a palavra `OI` com os gestos das letras e confirmar cada letra.
+Montar a palavra alvo com os gestos das letras e confirmar cada letra.

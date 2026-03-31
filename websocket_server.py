@@ -95,6 +95,11 @@ async def handle_connection(websocket):
                     response_payload = build_result_payload(service, exercise_service=exercise_service)
                     if exercise_service is not None:
                         response_payload["exercicio"] = exercise_service.restart_round()
+                elif action == "proxima_palavra":
+                    service.clear_word()
+                    response_payload = build_result_payload(service, exercise_service=exercise_service)
+                    if exercise_service is not None:
+                        response_payload["exercicio"] = exercise_service.next_word()
                 else:
                     frame_base64 = payload["frame"]
                     frame = decode_frame(frame_base64)
