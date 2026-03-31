@@ -95,8 +95,17 @@ async def main():
                 )
                 cv2.putText(
                     frame,
-                    "ESPACO confirma | C limpa | R reinicia | N proxima",
-                    (30, 300),
+                    f"Ultima concluida: {exercicio.get('ultima_palavra_concluida', '')}",
+                    (30, 290),
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    0.65,
+                    (180, 255, 180),
+                    2,
+                )
+                cv2.putText(
+                    frame,
+                    "ESPACO confirma | C limpa | R reinicia | N proxima manual",
+                    (30, 325),
                     cv2.FONT_HERSHEY_SIMPLEX,
                     0.6,
                     (255, 255, 255),
@@ -105,18 +114,18 @@ async def main():
                 cv2.putText(
                     frame,
                     "1 facil | 2 medio | 3 dificil | ESC sai",
-                    (30, 325),
+                    (30, 350),
                     cv2.FONT_HERSHEY_SIMPLEX,
                     0.6,
                     (255, 255, 255),
                     2,
                 )
 
-                if exercicio.get("acertou"):
+                if exercicio.get("ultima_palavra_concluida"):
                     cv2.putText(
                         frame,
                         "ACERTOU!",
-                        (30, 365),
+                        (30, 390),
                         cv2.FONT_HERSHEY_SIMPLEX,
                         1.2,
                         (0, 255, 0),

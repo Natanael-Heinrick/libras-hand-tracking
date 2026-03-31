@@ -22,6 +22,7 @@ class ExerciseGameService:
         self.score = 0
         self.level = 1
         self.completed = False
+        self.last_completed_word = ""
         self.last_feedback = "Monte a palavra alvo usando os gestos e confirme as letras."
         self.selected_difficulty = "facil"
         self.filtered_words = []
@@ -33,9 +34,13 @@ class ExerciseGameService:
         self.completed = word == self.target_word
 
         if self.completed:
+            completed_word = self.target_word
             self.score += self.points_per_word
             self.level = self._calculate_level()
-            self.last_feedback = "Acertou a palavra alvo."
+            self.last_completed_word = completed_word
+            self.last_feedback = f"Acertou {completed_word}. Carregando a proxima palavra."
+            self._advance_word()
+            return self.build_state("")
         else:
             self.last_feedback = "Ainda nao corresponde a palavra alvo."
 
@@ -43,6 +48,7 @@ class ExerciseGameService:
 
     def restart_round(self) -> dict:
         self.completed = False
+        self.last_completed_word = ""
         self.last_feedback = "Rodada reiniciada. Tente novamente."
         return self.build_state("")
 
@@ -51,6 +57,7 @@ class ExerciseGameService:
             self.current_index = (self.current_index + 1) % len(self.filtered_words)
             self._set_current_word(self.current_index)
         self.completed = False
+        self.last_completed_word = ""
         self.last_feedback = "Nova palavra carregada."
         return self.build_state("")
 
@@ -63,6 +70,7 @@ class ExerciseGameService:
         self.selected_difficulty = normalized
         self._apply_difficulty_filter(normalized)
         self.completed = False
+        self.last_completed_word = ""
         self.last_feedback = f"Dificuldade alterada para {normalized}."
         return self.build_state("")
 
@@ -81,6 +89,7 @@ class ExerciseGameService:
             "total_palavras_csv": len(self.words),
             "palavra_usuario": (current_word or "").strip().upper(),
             "acertou": self.completed,
+            "ultima_palavra_concluida": self.last_completed_word,
             "feedback": self.last_feedback,
             "fonte_dados": str(self.csv_path.relative_to(Path.cwd())) if self.csv_path.exists() else "fallback",
         }
@@ -109,6 +118,11 @@ class ExerciseGameService:
         self.difficulty = selected["nivel"]
         self.word_size = selected["tamanho"]
         self.points_per_word = POINTS_BY_DIFFICULTY.get(self.difficulty, 1)
+
+    def _advance_word(self):
+        if self.filtered_words:
+            self.current_index = (self.current_index + 1) % len(self.filtered_words)
+            self._set_current_word(self.current_index)
 
     def _load_words(self) -> list[dict]:
         if not self.csv_path.exists():

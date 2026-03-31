@@ -25,6 +25,13 @@ Base inicial do modo exercicio via WebSocket.
 - nivel calculado a partir da pontuacao
 - troca manual de dificuldade durante o teste
 
+## Bloco 4
+
+- progressao automatica para a proxima palavra ao acertar
+- registro da ultima palavra concluida
+- manutencao de pontuacao e nivel entre rodadas
+- opcao de avancar manualmente continua disponivel para teste
+
 ## Objetivo do teste
 
 Montar a palavra alvo com os gestos das letras e confirmar cada letra.
