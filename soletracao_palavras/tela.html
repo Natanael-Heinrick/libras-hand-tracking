@@ -1,0 +1,678 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Soletracao por GIF</title>
+    <style>
+        :root {
+            --bg: #f2efe8;
+            --panel: #fffaf2;
+            --ink: #1f2937;
+            --muted: #6b7280;
+            --accent: #d97706;
+            --accent-2: #0f766e;
+            --border: #e5dccd;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+            font-family: Georgia, "Times New Roman", serif;
+            color: var(--ink);
+            background:
+                radial-gradient(circle at top left, #fde68a 0, transparent 25%),
+                linear-gradient(160deg, #f7f1e6 0%, #efe6d8 100%);
+            display: grid;
+            place-items: center;
+            padding: 24px;
+        }
+
+        .app {
+            width: min(920px, 100%);
+            background: rgba(255, 250, 242, 0.92);
+            border: 1px solid var(--border);
+            border-radius: 28px;
+            padding: 28px;
+            box-shadow: 0 18px 40px rgba(73, 52, 16, 0.12);
+            backdrop-filter: blur(12px);
+        }
+
+        h1 {
+            margin: 0 0 8px;
+            font-size: clamp(2rem, 3vw, 3.2rem);
+            line-height: 1;
+        }
+
+        p {
+            margin: 0;
+            color: var(--muted);
+            font-size: 1rem;
+        }
+
+        form {
+            display: grid;
+            grid-template-columns: 1fr auto;
+            gap: 12px;
+            margin-top: 24px;
+        }
+
+        input, button {
+            border-radius: 16px;
+            border: 1px solid var(--border);
+            padding: 16px 18px;
+            font: inherit;
+        }
+
+        input {
+            background: #fff;
+            font-size: 1.1rem;
+        }
+
+        button {
+            background: var(--accent);
+            color: white;
+            border: none;
+            cursor: pointer;
+            min-width: 150px;
+            font-weight: 700;
+        }
+
+        .status {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            margin-top: 18px;
+            padding: 10px 14px;
+            border-radius: 999px;
+            background: #fff;
+            border: 1px solid var(--border);
+            color: var(--accent-2);
+            font-weight: 700;
+        }
+
+        .live-text {
+            margin-top: 14px;
+            padding: 14px 16px;
+            border-radius: 18px;
+            background: #fff;
+            border: 1px solid var(--border);
+            color: var(--ink);
+            font-weight: 700;
+        }
+
+        .live-text span {
+            color: var(--accent-2);
+        }
+
+        .result {
+            margin-top: 28px;
+            display: grid;
+            gap: 20px;
+            grid-template-columns: 1.15fr 0.85fr;
+        }
+
+        .player, .details, .capture {
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: 24px;
+            padding: 20px;
+        }
+
+        .capture {
+            margin-top: 20px;
+        }
+
+        .actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            margin-top: 16px;
+        }
+
+        .actions button.secondary {
+            background: var(--accent-2);
+        }
+
+        .actions button.ghost {
+            background: #fff;
+            color: var(--ink);
+            border: 1px solid var(--border);
+        }
+
+        audio {
+            width: 100%;
+            margin-top: 16px;
+        }
+
+        .stage {
+            min-height: 340px;
+            display: grid;
+            place-items: center;
+            border-radius: 18px;
+            background:
+                linear-gradient(135deg, rgba(217, 119, 6, 0.08), rgba(15, 118, 110, 0.08)),
+                #fff;
+            overflow: hidden;
+        }
+
+        .stage img {
+            max-width: min(100%, 360px);
+            max-height: 300px;
+            border-radius: 18px;
+            object-fit: contain;
+            display: none;
+        }
+
+        .stage img.visible {
+            display: block;
+        }
+
+        .placeholder {
+            color: var(--muted);
+            text-align: center;
+            max-width: 280px;
+        }
+
+        .sequence {
+            display: grid;
+            gap: 10px;
+            margin-top: 16px;
+        }
+
+        .word-group {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            align-items: center;
+            padding: 12px;
+            border-radius: 18px;
+            background: rgba(255, 255, 255, 0.78);
+            border: 1px solid var(--border);
+        }
+
+        .word-label {
+            min-width: 72px;
+            font-weight: 700;
+            color: var(--accent);
+        }
+
+        .word-letters {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .chip {
+            padding: 10px 12px;
+            border-radius: 999px;
+            border: 1px solid var(--border);
+            background: white;
+            font-weight: 700;
+        }
+
+        .chip.active {
+            background: var(--accent-2);
+            color: white;
+            border-color: var(--accent-2);
+        }
+
+        pre {
+            margin: 16px 0 0;
+            padding: 14px;
+            border-radius: 18px;
+            background: #1f2937;
+            color: #f9fafb;
+            overflow: auto;
+            font-size: 0.9rem;
+        }
+
+        @media (max-width: 780px) {
+            form, .result {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <main class="app">
+        <h1>Soletracao por GIF</h1>
+        <p>Digite uma palavra, consulte a API e reproduza os GIFs letra por letra na tela.</p>
+
+        <form id="spell-form">
+            <input id="word-input" type="text" placeholder="Digite uma palavra, por exemplo: oi" value="oi" />
+            <button type="submit">Mostrar</button>
+        </form>
+
+        <div class="status" id="status-pill">Status: aguardando teste</div>
+
+        <section class="capture">
+            <h2>Captura de audio</h2>
+            <p>Grave um audio curto no navegador e envie para o backend salvar localmente.</p>
+            <div class="actions">
+                <button type="button" class="secondary" id="record-button">Gravar audio</button>
+                <button type="button" class="ghost" id="stop-button" disabled>Parar gravacao</button>
+                <button type="button" class="ghost" id="send-audio-button" disabled>Enviar audio</button>
+                <button type="button" class="ghost" id="transcribe-button" disabled>Transcrever</button>
+                <button type="button" class="ghost" id="transcribe-play-button" disabled>Transcrever + Mostrar</button>
+                <button type="button" class="secondary" id="browser-speech-button">Falar e Mostrar</button>
+                <button type="button" class="ghost" id="browser-speech-play-button">So Transcrever</button>
+            </div>
+            <div class="live-text">Ultimo texto reconhecido: <span id="recognized-text">nenhum</span></div>
+            <audio id="audio-preview" controls></audio>
+        </section>
+
+        <section class="result">
+            <div class="player">
+                <h2>Reproducao</h2>
+                <div class="stage" id="stage">
+                    <p class="placeholder" id="placeholder">A sequencia de GIFs aparecera aqui.</p>
+                </div>
+                <div class="sequence" id="sequence"></div>
+            </div>
+
+            <div class="details">
+                <h2>Resposta da API</h2>
+                <pre id="payload-view">{}</pre>
+            </div>
+        </section>
+    </main>
+
+    <script>
+        const form = document.getElementById("spell-form");
+        const input = document.getElementById("word-input");
+        const statusPill = document.getElementById("status-pill");
+        const payloadView = document.getElementById("payload-view");
+        const sequence = document.getElementById("sequence");
+        const stage = document.getElementById("stage");
+        const placeholder = document.getElementById("placeholder");
+        const recordButton = document.getElementById("record-button");
+        const stopButton = document.getElementById("stop-button");
+        const sendAudioButton = document.getElementById("send-audio-button");
+        const transcribeButton = document.getElementById("transcribe-button");
+        const transcribePlayButton = document.getElementById("transcribe-play-button");
+        const browserSpeechButton = document.getElementById("browser-speech-button");
+        const browserSpeechPlayButton = document.getElementById("browser-speech-play-button");
+        const recognizedText = document.getElementById("recognized-text");
+        const audioPreview = document.getElementById("audio-preview");
+
+        let statusPollTimer = null;
+        let activeSessionId = null;
+        let mediaRecorder = null;
+        let currentAudioBlob = null;
+        let audioChunks = [];
+        let lastUploadedAudio = null;
+        let browserRecognition = null;
+
+        function setStatus(text) {
+            statusPill.textContent = `Status: ${text}`;
+        }
+
+        function setRecognizedText(text) {
+            recognizedText.textContent = text || "nenhum";
+        }
+
+        function blobToDataUrl(blob) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onloadend = () => resolve(reader.result);
+                reader.onerror = reject;
+                reader.readAsDataURL(blob);
+            });
+        }
+
+        function resetStage() {
+            if (statusPollTimer) {
+                clearTimeout(statusPollTimer);
+                statusPollTimer = null;
+            }
+
+            activeSessionId = null;
+            placeholder.style.display = "block";
+            stage.querySelectorAll("img").forEach((img) => img.remove());
+            sequence.innerHTML = "";
+        }
+
+        function renderSequence(groups) {
+            sequence.innerHTML = "";
+            groups.forEach((group) => {
+                const wrapper = document.createElement("div");
+                wrapper.className = "word-group";
+
+                const label = document.createElement("div");
+                label.className = "word-label";
+                label.textContent = group.palavra;
+
+                const letters = document.createElement("div");
+                letters.className = "word-letters";
+
+                group.sequencia.forEach((item) => {
+                    const chip = document.createElement("div");
+                    chip.className = "chip";
+                    chip.dataset.wordIndex = String(group.indice_palavra);
+                    chip.dataset.letterIndex = String(item.indice_letra);
+                    chip.textContent = item.letra;
+                    letters.appendChild(chip);
+                });
+
+                wrapper.appendChild(label);
+                wrapper.appendChild(letters);
+                sequence.appendChild(wrapper);
+            });
+        }
+
+        function renderCurrentItem(item, index) {
+            stage.querySelectorAll("img").forEach((node) => node.remove());
+            sequence.querySelectorAll(".chip").forEach((chip) => chip.classList.remove("active"));
+
+            if (!item) {
+                placeholder.style.display = "block";
+                setStatus("continue");
+                return;
+            }
+
+            if (item.tipo === "pausa") {
+                placeholder.style.display = "block";
+                setStatus("hold - pausa entre palavras");
+                return;
+            }
+
+            const activeWordIndex = String(item.indice_palavra);
+            const chips = Array.from(
+                sequence.querySelectorAll(`.chip[data-word-index="${activeWordIndex}"]`)
+            );
+            const activeChip =
+                chips.find((chip) => chip.dataset.letterIndex === String(item.indice_letra)) || chips[0];
+
+            if (activeChip) {
+                activeChip.classList.add("active");
+            }
+
+            const img = document.createElement("img");
+            img.src = item.gif_url;
+            img.alt = `GIF da letra ${item.letra}`;
+            img.className = "visible";
+
+            placeholder.style.display = "none";
+            stage.appendChild(img);
+            setStatus(`hold - exibindo ${item.letra} da palavra ${item.palavra}`);
+        }
+
+        async function pollStatus() {
+            const response = await fetch("/soletracao-palavras/status");
+            const payload = await response.json();
+            payloadView.textContent = JSON.stringify(payload, null, 2);
+
+            if (!response.ok || payload.session_id !== activeSessionId) {
+                setStatus("erro");
+                return;
+            }
+
+            renderCurrentItem(payload.item_atual, payload.indice_atual);
+
+            if (payload.status_atual === "hold") {
+                statusPollTimer = setTimeout(() => {
+                    pollStatus().catch(() => {
+                        setStatus("falha ao consultar status");
+                    });
+                }, 250);
+            }
+        }
+
+        async function startPlayback(word) {
+            resetStage();
+            setStatus("iniciando execucao");
+
+            const response = await fetch(`/soletracao-palavras/iniciar?texto=${encodeURIComponent(word)}`);
+            const payload = await response.json();
+            payloadView.textContent = JSON.stringify(payload, null, 2);
+
+            if (!response.ok) {
+                setStatus("erro");
+                return;
+            }
+
+            activeSessionId = payload.session_id;
+            renderSequence(payload.grupos_palavras || []);
+            await pollStatus();
+        }
+
+        async function startAudioRecording() {
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                setStatus("microfone nao suportado");
+                return;
+            }
+
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            audioChunks = [];
+            currentAudioBlob = null;
+            audioPreview.removeAttribute("src");
+
+            mediaRecorder = new MediaRecorder(stream);
+            mediaRecorder.ondataavailable = (event) => {
+                if (event.data.size > 0) {
+                    audioChunks.push(event.data);
+                }
+            };
+
+            mediaRecorder.onstop = () => {
+                currentAudioBlob = new Blob(audioChunks, { type: mediaRecorder.mimeType || "audio/webm" });
+                audioPreview.src = URL.createObjectURL(currentAudioBlob);
+                sendAudioButton.disabled = false;
+                transcribeButton.disabled = true;
+                transcribePlayButton.disabled = true;
+                recordButton.disabled = false;
+                stopButton.disabled = true;
+                stream.getTracks().forEach((track) => track.stop());
+                setStatus("audio gravado");
+            };
+
+            mediaRecorder.start();
+            recordButton.disabled = true;
+            stopButton.disabled = false;
+            sendAudioButton.disabled = true;
+            setStatus("gravando audio");
+        }
+
+        function stopAudioRecording() {
+            if (mediaRecorder && mediaRecorder.state !== "inactive") {
+                mediaRecorder.stop();
+            }
+        }
+
+        async function sendRecordedAudio() {
+            if (!currentAudioBlob) {
+                setStatus("grave um audio primeiro");
+                return;
+            }
+
+            setStatus("enviando audio");
+            const dataUrl = await blobToDataUrl(currentAudioBlob);
+            const mimeType = currentAudioBlob.type || "audio/webm";
+            const extension = mimeType.includes("ogg") ? "ogg" : "webm";
+
+            const response = await fetch("/soletracao-palavras/audio", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                    audio_base64: dataUrl,
+                    extensao: extension,
+                }),
+            });
+
+            const payload = await response.json();
+            payloadView.textContent = JSON.stringify(payload, null, 2);
+
+            if (!response.ok) {
+                setStatus("erro ao enviar audio");
+                return;
+            }
+
+            lastUploadedAudio = payload.audio;
+            transcribeButton.disabled = false;
+            transcribePlayButton.disabled = false;
+            setStatus("audio salvo no backend");
+        }
+
+        async function transcribeAudio(autoPlay = false) {
+            if (!lastUploadedAudio) {
+                setStatus("envie um audio primeiro");
+                return;
+            }
+
+            setStatus("transcrevendo audio");
+            const response = await fetch("/soletracao-palavras/transcrever", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({}),
+            });
+
+            const payload = await response.json();
+            payloadView.textContent = JSON.stringify(payload, null, 2);
+
+            if (!response.ok) {
+                setStatus("erro ao transcrever");
+                return;
+            }
+
+            input.value = payload.texto_normalizado;
+            setRecognizedText(payload.texto_normalizado);
+            setStatus(`texto reconhecido: ${payload.texto_normalizado}`);
+
+            if (autoPlay) {
+                await startPlayback(payload.texto_normalizado);
+            }
+        }
+
+        function createBrowserRecognition() {
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            if (!SpeechRecognition) {
+                return null;
+            }
+
+            const recognition = new SpeechRecognition();
+            recognition.lang = "pt-BR";
+            recognition.interimResults = false;
+            recognition.maxAlternatives = 1;
+            return recognition;
+        }
+
+        async function transcribeFromBrowser(autoPlay = false) {
+            if (!browserRecognition) {
+                browserRecognition = createBrowserRecognition();
+            }
+
+            if (!browserRecognition) {
+                setStatus("fala ao vivo nao suportada neste navegador");
+                return;
+            }
+
+            setStatus("ouvindo no navegador");
+            setRecognizedText("ouvindo...");
+
+            await new Promise((resolve, reject) => {
+                browserRecognition.onresult = async (event) => {
+                    const transcript = (event.results[0][0].transcript || "").trim().toLowerCase();
+                    input.value = transcript;
+                    setRecognizedText(transcript || "nenhum");
+                    payloadView.textContent = JSON.stringify(
+                        {
+                            rota: "/navegador/transcrever",
+                            modo: "browser-speech-recognition",
+                            texto_transcrito: transcript,
+                            texto_normalizado: transcript,
+                        },
+                        null,
+                        2,
+                    );
+
+                    try {
+                        setStatus(`texto reconhecido: ${transcript}`);
+                        if (autoPlay && transcript) {
+                            setStatus(`texto reconhecido: ${transcript} | iniciando exibicao`);
+                            await startPlayback(transcript);
+                        }
+                        resolve();
+                    } catch (error) {
+                        reject(error);
+                    }
+                };
+
+                browserRecognition.onerror = (event) => {
+                    setRecognizedText("erro ao ouvir");
+                    reject(new Error(event.error || "erro de reconhecimento"));
+                };
+
+                browserRecognition.onend = () => {
+                    resolve();
+                };
+
+                browserRecognition.start();
+            });
+        }
+
+        form.addEventListener("submit", (event) => {
+            event.preventDefault();
+            const value = input.value.trim();
+            if (!value) {
+                setStatus("digite uma palavra");
+                return;
+            }
+
+            startPlayback(value).catch(() => {
+                setStatus("falha ao carregar");
+            });
+        });
+
+        recordButton.addEventListener("click", () => {
+            startAudioRecording().catch(() => {
+                setStatus("falha ao acessar microfone");
+                recordButton.disabled = false;
+                stopButton.disabled = true;
+            });
+        });
+
+        stopButton.addEventListener("click", () => {
+            stopAudioRecording();
+        });
+
+        sendAudioButton.addEventListener("click", () => {
+            sendRecordedAudio().catch(() => {
+                setStatus("falha ao enviar audio");
+            });
+        });
+
+        transcribeButton.addEventListener("click", () => {
+            transcribeAudio(false).catch(() => {
+                setStatus("falha ao transcrever");
+            });
+        });
+
+        transcribePlayButton.addEventListener("click", () => {
+            transcribeAudio(true).catch(() => {
+                setStatus("falha ao transcrever e mostrar");
+            });
+        });
+
+        browserSpeechButton.addEventListener("click", () => {
+            transcribeFromBrowser(true).catch(() => {
+                setStatus("falha na fala ao vivo");
+            });
+        });
+
+        browserSpeechPlayButton.addEventListener("click", () => {
+            transcribeFromBrowser(false).catch(() => {
+                setStatus("falha na fala ao vivo");
+            });
+        });
+    </script>
+</body>
+</html>

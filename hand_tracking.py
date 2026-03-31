@@ -1,102 +1,125 @@
+import asyncio
+import base64
+import json
+import subprocess
+import threading
+
 import cv2
-import mediapipe as mp
-from collections import Counter
-from hand_geometry import detectar_dedos
-from letter_classifier import classificar_letra
+from websockets.asyncio.client import connect
 
 
-# Inicializa mediapipe
-mp_hands = mp.solutions.hands
-hands = mp_hands.Hands()
+SERVER_URL = "ws://127.0.0.1:8765/alfabeto"
 
-# Utilitário para desenhar pontos
-mp_draw = mp.solutions.drawing_utils
 
-# Webcam
-camera = cv2.VideoCapture(0, cv2.CAP_DSHOW)
-letra = ""
-palavra = ""
-ultima_letra = ""
-historico_letras = []
-letra_estavel = ""
+def encode_frame(frame, quality=70):
+    ok, buffer = cv2.imencode(".jpg", frame, [int(cv2.IMWRITE_JPEG_QUALITY), quality])
+    if not ok:
+        raise RuntimeError("Nao foi possivel codificar o frame")
 
-while True:
-    ret, frame = camera.read()
+    return base64.b64encode(buffer.tobytes()).decode("utf-8")
 
-    if not ret:
-        print("Erro ao acessar webcam")
-        break
 
-    # Converter BGR para RGB
-    rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+def falar_texto(texto):
+    texto = (texto or "").strip()
+    if not texto:
+        return
 
-    # Processar imagem
-    results = hands.process(rgb_frame)
-
-    # Se detectar mão
-    if results.multi_hand_landmarks:
-        for hand_landmarks in results.multi_hand_landmarks:
-            altura, largura, _ = frame.shape
-
-            dedos = detectar_dedos(hand_landmarks)
-            letra = classificar_letra(dedos, hand_landmarks)
-            if letra != "":
-                historico_letras.append(letra)
-
-            if len(historico_letras) > 8:
-                historico_letras.pop(0)
-
-            if historico_letras:
-                letra_estavel = Counter(historico_letras).most_common(1)[0][0]
-            else:
-                letra_estavel = ""
-
-            key = cv2.waitKey(1) & 0xFF
-
-            if key == ord(" "):  # espaço
-                if letra_estavel != "":
-                    palavra += letra_estavel
-
-            if key == ord("c"):
-                palavra = ""
-
-            if key == 27:
-                break
-
-            print("Letra:", letra)
-
-            print(dedos)
-            # Desenhar pontos da mão
-            mp_draw.draw_landmarks(frame, hand_landmarks, mp_hands.HAND_CONNECTIONS)
-    cv2.putText(
-        frame,
-        f"Letra: {letra_estavel}",
-        (50, 100),
-        cv2.FONT_HERSHEY_SIMPLEX,
-        2,
-        (0, 255, 0),
-        3,
+    texto_seguro = texto.replace("'", "''")
+    comando = (
+        "Add-Type -AssemblyName System.Speech; "
+        "$voz = New-Object System.Speech.Synthesis.SpeechSynthesizer; "
+        f"$voz.Speak('{texto_seguro}')"
     )
-    cv2.putText(
-        frame,
-        f"Palavra: {palavra}",
-        (50, 180),
-        cv2.FONT_HERSHEY_SIMPLEX,
-        2,
-        (255, 0, 0),
-        3,
-    )
-    cv2.imshow("Hand Tracking", frame)
-    key = cv2.waitKey(1) & 0xFF
-    if key == ord(" "):  # espaço adiciona letra
-        if letra_estavel != "":
-            palavra += letra_estavel
-    elif key == ord("c"):  # limpa palavra
-        palavra = ""
 
-    elif key == 27:  # ESC sai
+    def _executar():
+        subprocess.run(
+            ["powershell", "-NoProfile", "-Command", comando],
+            check=False,
+            creationflags=subprocess.CREATE_NO_WINDOW,
+        )
 
-        break
+    threading.Thread(target=_executar, daemon=True).start()
 
-camera.release()
-cv2.destroyAllWindows()
+
+async def main():
+    camera = cv2.VideoCapture(0, cv2.CAP_DSHOW)
+    if not camera.isOpened():
+        raise RuntimeError("Erro ao acessar webcam local")
+
+    try:
+        async with connect(SERVER_URL, max_size=2**22) as websocket:
+            while True:
+                ok, frame = camera.read()
+                if not ok:
+                    raise RuntimeError("Erro ao capturar frame da webcam")
+
+                await websocket.send(json.dumps({"frame": encode_frame(frame)}))
+                response = json.loads(await websocket.recv())
+
+                if response.get("tipo") == "erro":
+                    raise RuntimeError(response.get("mensagem", "Erro desconhecido do servidor"))
+
+                estado = response.get("estado", {})
+                letra = estado.get("letra_estavel") or estado.get("letra") or ""
+
+                cv2.putText(
+                    frame,
+                    f"Rota: /alfabeto",
+                    (30, 35),
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    0.8,
+                    (255, 255, 255),
+                    2,
+                )
+                cv2.putText(
+                    frame,
+                    f"Letra: {letra}",
+                    (30, 75),
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    1.2,
+                    (0, 255, 0),
+                    3,
+                )
+                cv2.putText(
+                    frame,
+                    f"Palavra: {estado.get('palavra', '')}",
+                    (30, 120),
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    1.0,
+                    (255, 0, 0),
+                    2,
+                )
+                cv2.putText(
+                    frame,
+                    "ESPACO confirma | C limpa | P fala",
+                    (30, 160),
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    0.6,
+                    (255, 255, 255),
+                    2,
+                )
+
+                cv2.imshow("Hand Tracking - Alfabeto", frame)
+                key = cv2.waitKey(1) & 0xFF
+
+                if key == ord(" "):
+                    await websocket.send(json.dumps({"acao": "confirmar_letra"}))
+                    response = json.loads(await websocket.recv())
+                    if response.get("tipo") == "erro":
+                        raise RuntimeError(response.get("mensagem", "Erro ao confirmar letra"))
+                elif key == ord("c"):
+                    await websocket.send(json.dumps({"acao": "limpar_palavra"}))
+                    response = json.loads(await websocket.recv())
+                    if response.get("tipo") == "erro":
+                        raise RuntimeError(response.get("mensagem", "Erro ao limpar palavra"))
+                elif key == ord("p"):
+                    falar_texto(estado.get("palavra", ""))
+                elif key == 27:
+                    break
+    finally:
+        camera.release()
+        cv2.destroyAllWindows()
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
