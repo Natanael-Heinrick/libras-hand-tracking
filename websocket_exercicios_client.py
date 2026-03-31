@@ -61,7 +61,11 @@ async def main():
                 )
                 cv2.putText(
                     frame,
-                    f"Pontos: {exercicio.get('pontuacao', 0)} | Nivel: {exercicio.get('nivel', 1)} | {exercicio.get('dificuldade', '')}",
+                    (
+                        f"Pontos: {exercicio.get('pontuacao', 0)} | "
+                        f"Nivel: {exercicio.get('nivel', 1)} | "
+                        f"{exercicio.get('dificuldade', '')} ({exercicio.get('pontos_por_acerto', 1)} pts)"
+                    ),
                     (30, 195),
                     cv2.FONT_HERSHEY_SIMPLEX,
                     0.7,
@@ -79,17 +83,29 @@ async def main():
                 )
                 cv2.putText(
                     frame,
-                    f"CSV: {exercicio.get('indice_palavra', 0) + 1}/{exercicio.get('total_palavras', 0)}",
+                    (
+                        f"Filtro: {exercicio.get('dificuldade_selecionada', '')} | "
+                        f"CSV: {exercicio.get('indice_palavra', 0) + 1}/{exercicio.get('total_palavras', 0)}"
+                    ),
                     (30, 265),
                     cv2.FONT_HERSHEY_SIMPLEX,
-                    0.7,
+                    0.65,
                     (255, 220, 180),
                     2,
                 )
                 cv2.putText(
                     frame,
-                    "ESPACO confirma | C limpa | R reinicia | N proxima | ESC sai",
+                    "ESPACO confirma | C limpa | R reinicia | N proxima",
                     (30, 300),
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    0.6,
+                    (255, 255, 255),
+                    2,
+                )
+                cv2.putText(
+                    frame,
+                    "1 facil | 2 medio | 3 dificil | ESC sai",
+                    (30, 325),
                     cv2.FONT_HERSHEY_SIMPLEX,
                     0.6,
                     (255, 255, 255),
@@ -100,7 +116,7 @@ async def main():
                     cv2.putText(
                         frame,
                         "ACERTOU!",
-                        (30, 345),
+                        (30, 365),
                         cv2.FONT_HERSHEY_SIMPLEX,
                         1.2,
                         (0, 255, 0),
@@ -130,6 +146,21 @@ async def main():
                     response = json.loads(await websocket.recv())
                     if response.get("tipo") == "erro":
                         raise RuntimeError(response.get("mensagem", "Erro ao avancar palavra"))
+                elif key == ord("1"):
+                    await websocket.send(json.dumps({"acao": "definir_dificuldade", "dificuldade": "facil"}))
+                    response = json.loads(await websocket.recv())
+                    if response.get("tipo") == "erro":
+                        raise RuntimeError(response.get("mensagem", "Erro ao definir dificuldade"))
+                elif key == ord("2"):
+                    await websocket.send(json.dumps({"acao": "definir_dificuldade", "dificuldade": "medio"}))
+                    response = json.loads(await websocket.recv())
+                    if response.get("tipo") == "erro":
+                        raise RuntimeError(response.get("mensagem", "Erro ao definir dificuldade"))
+                elif key == ord("3"):
+                    await websocket.send(json.dumps({"acao": "definir_dificuldade", "dificuldade": "dificil"}))
+                    response = json.loads(await websocket.recv())
+                    if response.get("tipo") == "erro":
+                        raise RuntimeError(response.get("mensagem", "Erro ao definir dificuldade"))
                 elif key == 27:
                     break
     finally:
