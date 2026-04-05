@@ -3,13 +3,14 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
-from soletracao_palavras import SpellingPlaybackService, WordSpellingService
+from soletracao_palavras import InesDictionaryService, SpellingPlaybackService, WordSpellingService
 
 
 HOST = "127.0.0.1"
 PORT = 8000
 word_spelling_service = WordSpellingService()
 playback_service = SpellingPlaybackService(word_spelling_service)
+ines_dictionary_service = InesDictionaryService()
 
 
 class HandTrackingHandler(BaseHTTPRequestHandler):
@@ -51,6 +52,8 @@ class HandTrackingHandler(BaseHTTPRequestHandler):
                 {
                     "mensagem": "API de transcricao por voz ativa",
                     "rotas": [
+                        "/dicionario-ines/normalizar?texto=felicidade",
+                        "/dicionario-ines/segmentar?texto=oi%20tudo%20bem",
                         "/soletracao-palavras/iniciar?texto=oi",
                         "/soletracao-palavras/status",
                         "/soletracao-palavras/tela",
@@ -60,6 +63,7 @@ class HandTrackingHandler(BaseHTTPRequestHandler):
                         "Falar e Mostrar",
                         "Transcrever",
                     ],
+                    "observacao": "Bloco 3.2 ativo: resposta inclui texto_gloss_base.",
                 }
             )
             return
@@ -90,6 +94,38 @@ class HandTrackingHandler(BaseHTTPRequestHandler):
             self._send_json(payload)
             return
 
+        if route == "/dicionario-ines/normalizar":
+            texto = params.get("texto", [""])[0]
+            if not texto.strip():
+                self._send_json(
+                    {
+                        "erro": "Informe o parametro ?texto= com a palavra ou frase reconhecida",
+                        "exemplo": "/dicionario-ines/normalizar?texto=felicidade",
+                    },
+                    status=400,
+                )
+                return
+
+            payload = ines_dictionary_service.analyze_text(texto)
+            self._send_json(payload)
+            return
+
+        if route == "/dicionario-ines/segmentar":
+            texto = params.get("texto", [""])[0]
+            if not texto.strip():
+                self._send_json(
+                    {
+                        "erro": "Informe o parametro ?texto= com a frase reconhecida",
+                        "exemplo": "/dicionario-ines/segmentar?texto=oi%20tudo%20bem",
+                    },
+                    status=400,
+                )
+                return
+
+            payload = ines_dictionary_service.segment_text(texto)
+            self._send_json(payload)
+            return
+
         if route.startswith("/soletracao-palavras/gifs/"):
             gif_name = Path(parsed.path).name
             gif_path = Path(__file__).resolve().parent / "soletracao_palavras" / "gifs" / gif_name
@@ -109,9 +145,10 @@ def run():
     server = ThreadingHTTPServer((HOST, PORT), HandTrackingHandler)
     print(f"Servidor rodando em http://{HOST}:{PORT}")
     print(
-        "Rotas disponiveis: /soletracao-palavras/iniciar?texto=oi, "
-        "/soletracao-palavras/status, /soletracao-palavras/tela, "
-        "/soletracao-palavras/gifs/<arquivo>"
+        "Rotas disponiveis: /dicionario-ines/normalizar?texto=felicidade, "
+        "/dicionario-ines/segmentar?texto=oi%20tudo%20bem, "
+        "/soletracao-palavras/iniciar?texto=oi, /soletracao-palavras/status, "
+        "/soletracao-palavras/tela, /soletracao-palavras/gifs/<arquivo>"
     )
 
     try:

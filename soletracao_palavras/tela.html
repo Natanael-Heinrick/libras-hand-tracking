@@ -116,7 +116,7 @@
             grid-template-columns: 1.15fr 0.85fr;
         }
 
-        .player, .details, .capture {
+        .player, .details, .capture, .dictionary-card {
             background: var(--panel);
             border: 1px solid var(--border);
             border-radius: 24px;
@@ -226,6 +226,56 @@
             font-size: 0.9rem;
         }
 
+        .dictionary-card {
+            margin-top: 20px;
+        }
+
+        .dictionary-video {
+            width: 100%;
+            margin-top: 16px;
+            border-radius: 18px;
+            background: #000;
+        }
+
+        .dictionary-meta {
+            margin-top: 16px;
+            padding: 14px 16px;
+            border-radius: 18px;
+            background: #fff;
+            border: 1px solid var(--border);
+        }
+
+        .dictionary-meta strong {
+            color: var(--accent-2);
+        }
+
+        .dictionary-segments {
+            margin-top: 16px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .dictionary-chip {
+            padding: 10px 12px;
+            border-radius: 999px;
+            border: 1px solid var(--border);
+            background: white;
+            font-weight: 700;
+        }
+
+        .dictionary-chip.matched {
+            background: var(--accent-2);
+            border-color: var(--accent-2);
+            color: white;
+        }
+
+        .dictionary-chip.fallback {
+            background: #fff7ed;
+            border-color: #fdba74;
+            color: #9a3412;
+        }
+
         @media (max-width: 780px) {
             form, .result {
                 grid-template-columns: 1fr;
@@ -248,6 +298,18 @@
                 <button type="button" class="ghost" id="browser-speech-play-button">Transcrever</button>
             </div>
             <div class="live-text">Ultimo texto reconhecido: <span id="recognized-text">nenhum</span></div>
+        </section>
+
+        <section class="dictionary-card">
+            <h2>Dicionario INES - Bloco 3</h2>
+            <p>Veja a segmentacao da frase e a sequencia automatica de videos validos.</p>
+            <div class="dictionary-meta" id="dictionary-meta">
+                <strong>Segmento atual:</strong> <span id="dictionary-term">nenhum</span><br />
+                <strong>Video URL:</strong> <span id="dictionary-url">nenhuma</span><br />
+                <strong>Gloss base:</strong> <span id="dictionary-gloss">nenhum</span>
+            </div>
+            <video id="dictionary-video" class="dictionary-video" controls preload="none"></video>
+            <div class="dictionary-segments" id="dictionary-segments"></div>
         </section>
 
         <section class="result">
@@ -275,10 +337,17 @@
         const browserSpeechButton = document.getElementById("browser-speech-button");
         const browserSpeechPlayButton = document.getElementById("browser-speech-play-button");
         const recognizedText = document.getElementById("recognized-text");
+        const dictionaryTerm = document.getElementById("dictionary-term");
+        const dictionaryUrl = document.getElementById("dictionary-url");
+        const dictionaryGloss = document.getElementById("dictionary-gloss");
+        const dictionaryVideo = document.getElementById("dictionary-video");
+        const dictionarySegments = document.getElementById("dictionary-segments");
 
         let statusPollTimer = null;
         let activeSessionId = null;
         let browserRecognition = null;
+        let dictionaryQueue = [];
+        let dictionaryQueueIndex = 0;
 
         function setStatus(text) {
             statusPill.textContent = `Status: ${text}`;
@@ -286,6 +355,147 @@
 
         function setRecognizedText(text) {
             recognizedText.textContent = text || "nenhum";
+        }
+
+        function resetDictionaryPreview() {
+            dictionaryTerm.textContent = "nenhum";
+            dictionaryUrl.textContent = "nenhuma";
+            dictionaryGloss.textContent = "nenhum";
+            dictionarySegments.innerHTML = "";
+            dictionaryQueue = [];
+            dictionaryQueueIndex = 0;
+            dictionaryVideo.pause();
+            dictionaryVideo.removeAttribute("src");
+            dictionaryVideo.load();
+        }
+
+        function renderDictionaryQueue(queue) {
+            dictionarySegments.innerHTML = "";
+            queue.forEach((item) => {
+                const chip = document.createElement("div");
+                chip.className = `dictionary-chip ${item.resolvido_por_fallback ? "fallback" : "matched"}`;
+                chip.textContent = item.termo;
+                dictionarySegments.appendChild(chip);
+            });
+        }
+
+        function updateDictionaryPreview(queue, glossText = "") {
+            dictionaryQueue = queue;
+            dictionaryQueueIndex = 0;
+            dictionaryGloss.textContent = glossText || "nenhum";
+            renderDictionaryQueue(queue);
+
+            if (!queue.length) {
+                resetDictionaryPreview();
+                return;
+            }
+
+            dictionaryTerm.textContent = queue[0].termo || "nenhum";
+            dictionaryUrl.textContent = queue[0].video_url || "nenhuma";
+            dictionaryVideo.src = queue[0].video_url;
+        }
+
+        async function canLoadVideo(url) {
+            return await new Promise((resolve) => {
+                const probe = document.createElement("video");
+                let resolved = false;
+
+                const finish = (value) => {
+                    if (resolved) {
+                        return;
+                    }
+                    resolved = true;
+                    probe.removeAttribute("src");
+                    probe.load();
+                    resolve(value);
+                };
+
+                probe.preload = "metadata";
+                probe.onloadedmetadata = () => finish(true);
+                probe.onerror = () => finish(false);
+                probe.src = url;
+                probe.load();
+
+                setTimeout(() => finish(false), 3500);
+            });
+        }
+
+        async function resolveSegmentQueue(payload) {
+            const resolvedQueue = [];
+            let index = 0;
+            const groups = payload.grupos_segmentacao || [];
+
+            while (index < groups.length) {
+                const group = groups[index];
+                let selectedCandidate = null;
+
+                for (const candidate of group.candidatos) {
+                    const variants = candidate.variantes_video || [
+                        { termo: candidate.termo, video_url: candidate.video_url },
+                    ];
+
+                    for (const variant of variants) {
+                        const available = await canLoadVideo(variant.video_url);
+                        if (available) {
+                            selectedCandidate = {
+                                termo: variant.termo,
+                                palavras: candidate.palavras,
+                                video_url: variant.video_url,
+                                resolvido_por_fallback: candidate.tamanho_grupo === 1,
+                            };
+                            break;
+                        }
+                    }
+
+                    if (selectedCandidate) {
+                        break;
+                    }
+                }
+
+                if (!selectedCandidate) {
+                    const fallbackCandidate =
+                        group.candidatos.find((candidate) => candidate.tamanho_grupo === 1) ||
+                        group.candidatos[group.candidatos.length - 1] ||
+                        null;
+
+                    selectedCandidate = {
+                        termo: fallbackCandidate?.termo || group.palavra_inicial,
+                        palavras: [group.palavra_inicial],
+                        video_url:
+                            fallbackCandidate?.variantes_video?.[0]?.video_url ||
+                            fallbackCandidate?.video_url ||
+                            "",
+                        resolvido_por_fallback: true,
+                        indisponivel: true,
+                    };
+                    index += 1;
+                } else {
+                    index += selectedCandidate.palavras.length;
+                }
+
+                resolvedQueue.push(selectedCandidate);
+            }
+
+            return resolvedQueue;
+        }
+
+        function playDictionaryQueue() {
+            if (!dictionaryQueue.length || dictionaryQueueIndex >= dictionaryQueue.length) {
+                return;
+            }
+
+            const current = dictionaryQueue[dictionaryQueueIndex];
+            dictionaryTerm.textContent = current.termo || "nenhum";
+            dictionaryUrl.textContent = current.video_url || "nenhuma";
+
+            if (!current.video_url || current.indisponivel) {
+                dictionaryQueueIndex += 1;
+                playDictionaryQueue();
+                return;
+            }
+
+            dictionaryVideo.src = current.video_url;
+            dictionaryVideo.play().catch(() => {});
         }
 
         function resetStage() {
@@ -404,6 +614,23 @@
             await pollStatus();
         }
 
+        async function analyzeWithInesDictionary(text) {
+            const response = await fetch(`/dicionario-ines/segmentar?texto=${encodeURIComponent(text)}`);
+            const payload = await response.json();
+
+            if (!response.ok) {
+                throw new Error(payload.erro || "falha ao segmentar texto para o INES");
+            }
+
+            const queue = await resolveSegmentQueue(payload);
+            updateDictionaryPreview(queue, payload.texto_gloss_base || "");
+            playDictionaryQueue();
+            return {
+                ...payload,
+                fila_resolvida: queue,
+            };
+        }
+
         function createBrowserRecognition() {
             const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
             if (!SpeechRecognition) {
@@ -434,22 +661,28 @@
                 browserRecognition.onresult = async (event) => {
                     const transcript = (event.results[0][0].transcript || "").trim().toLowerCase();
                     setRecognizedText(transcript || "nenhum");
-                    payloadView.textContent = JSON.stringify(
-                        {
-                            rota: "/navegador/transcrever",
-                            modo: "browser-speech-recognition",
-                            texto_transcrito: transcript,
-                            texto_normalizado: transcript,
-                        },
-                        null,
-                        2,
-                    );
 
                     try {
-                        setStatus(`texto reconhecido: ${transcript}`);
+                        const inesPayload = await analyzeWithInesDictionary(transcript);
+                        payloadView.textContent = JSON.stringify(
+                            {
+                                rota: "/navegador/transcrever",
+                                modo: "browser-speech-recognition",
+                                texto_transcrito: transcript,
+                                texto_normalizado: inesPayload.texto_normalizado,
+                                texto_gloss_base: inesPayload.texto_gloss_base,
+                                dicionario_ines: inesPayload,
+                            },
+                            null,
+                            2,
+                        );
+
+                        setStatus(`texto reconhecido: ${inesPayload.texto_gloss_base || inesPayload.texto_normalizado}`);
                         if (autoPlay && transcript) {
-                            setStatus(`texto reconhecido: ${transcript} | iniciando exibicao`);
-                            await startPlayback(transcript);
+                            setStatus(
+                                `texto reconhecido: ${inesPayload.texto_gloss_base || inesPayload.texto_normalizado} | iniciando exibicao`
+                            );
+                            await startPlayback(inesPayload.texto_gloss_base || inesPayload.texto_normalizado);
                         }
                         resolve();
                     } catch (error) {
@@ -480,6 +713,11 @@
             transcribeFromBrowser(false).catch(() => {
                 setStatus("falha na fala ao vivo");
             });
+        });
+
+        dictionaryVideo.addEventListener("ended", () => {
+            dictionaryQueueIndex += 1;
+            playDictionaryQueue();
         });
     </script>
 </body>
