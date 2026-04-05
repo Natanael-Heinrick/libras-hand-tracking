@@ -235,13 +235,8 @@
 </head>
 <body>
     <main class="app">
-        <h1>Soletracao por GIF</h1>
-        <p>Digite uma palavra, consulte a API e reproduza os GIFs letra por letra na tela.</p>
-
-        <form id="spell-form">
-            <input id="word-input" type="text" placeholder="Digite uma palavra, por exemplo: oi" value="oi" />
-            <button type="submit">Mostrar</button>
-        </form>
+        <h1>Transcricao por voz</h1>
+        <p>Use a fala do navegador para transcrever o texto e, se quiser, iniciar a exibicao dos GIFs automaticamente.</p>
 
         <div class="status" id="status-pill">Status: aguardando teste</div>
 
@@ -250,7 +245,7 @@
             <p>Use o microfone do navegador para reconhecer a fala e, se quiser, iniciar a exibicao automaticamente.</p>
             <div class="actions">
                 <button type="button" class="secondary" id="browser-speech-button">Falar e Mostrar</button>
-                <button type="button" class="ghost" id="browser-speech-play-button">So Transcrever</button>
+                <button type="button" class="ghost" id="browser-speech-play-button">Transcrever</button>
             </div>
             <div class="live-text">Ultimo texto reconhecido: <span id="recognized-text">nenhum</span></div>
         </section>
@@ -272,8 +267,6 @@
     </main>
 
     <script>
-        const form = document.getElementById("spell-form");
-        const input = document.getElementById("word-input");
         const statusPill = document.getElementById("status-pill");
         const payloadView = document.getElementById("payload-view");
         const sequence = document.getElementById("sequence");
@@ -440,7 +433,6 @@
             await new Promise((resolve, reject) => {
                 browserRecognition.onresult = async (event) => {
                     const transcript = (event.results[0][0].transcript || "").trim().toLowerCase();
-                    input.value = transcript;
                     setRecognizedText(transcript || "nenhum");
                     payloadView.textContent = JSON.stringify(
                         {
@@ -477,19 +469,6 @@
                 browserRecognition.start();
             });
         }
-
-        form.addEventListener("submit", (event) => {
-            event.preventDefault();
-            const value = input.value.trim();
-            if (!value) {
-                setStatus("digite uma palavra");
-                return;
-            }
-
-            startPlayback(value).catch(() => {
-                setStatus("falha ao carregar");
-            });
-        });
 
         browserSpeechButton.addEventListener("click", () => {
             transcribeFromBrowser(true).catch(() => {
