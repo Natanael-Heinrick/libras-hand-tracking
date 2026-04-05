@@ -252,7 +252,7 @@
 
         <section class="capture">
             <h2>Captura de audio</h2>
-            <p>Grave um audio curto no navegador e envie para o backend salvar localmente.</p>
+            <p>Grave um audio curto no navegador e envie para processamento temporario no backend.</p>
             <div class="actions">
                 <button type="button" class="secondary" id="record-button">Gravar audio</button>
                 <button type="button" class="ghost" id="stop-button" disabled>Parar gravacao</button>
@@ -517,7 +517,7 @@
             lastUploadedAudio = payload.audio;
             transcribeButton.disabled = false;
             transcribePlayButton.disabled = false;
-            setStatus("audio salvo no backend");
+            setStatus("audio enviado temporariamente ao backend");
         }
 
         async function transcribeAudio(autoPlay = false) {

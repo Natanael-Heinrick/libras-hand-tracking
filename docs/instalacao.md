@@ -140,6 +140,11 @@ Terminal 2:
 python websocket_client.py
 ```
 
+Observacao:
+
+- o cliente do alfabeto conecta na rota `ws://127.0.0.1:8765/alfabeto`
+- se a URL ficar apenas como `ws://127.0.0.1:8765`, o servidor fecha a conexao normalmente e o cliente pode mostrar `ConnectionClosedOK`
+
 ### Fluxo WebSocket do modo exercícios
 
 Terminal 1:

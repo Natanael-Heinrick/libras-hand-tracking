@@ -2,15 +2,12 @@ from __future__ import annotations
 
 import base64
 from datetime import datetime
-from pathlib import Path
 
 
 class AudioCaptureService:
-    """Salva audios recebidos pela tela em uma pasta local."""
+    """Mantem apenas o ultimo audio recebido em memoria."""
 
-    def __init__(self, base_dir: Path | None = None):
-        self.base_dir = (base_dir or Path(__file__).resolve().parent / "audios").resolve()
-        self.base_dir.mkdir(parents=True, exist_ok=True)
+    def __init__(self, base_dir=None):
         self._last_saved_audio: dict | None = None
 
     def save_base64_audio(self, audio_base64: str, extension: str = "webm") -> dict:
@@ -30,16 +27,13 @@ class AudioCaptureService:
         if not safe_extension.isalnum():
             safe_extension = "webm"
 
-        file_name = f"audio_{datetime.now().strftime('%Y%m%d_%H%M%S_%f')}.{safe_extension}"
-        file_path = self.base_dir / file_name
-        file_path.write_bytes(audio_bytes)
-
         saved_audio = {
-            "arquivo": file_name,
-            "arquivo_path": str(file_path.relative_to(Path.cwd())),
-            "arquivo_url": f"/soletracao-palavras/audios/{file_name}",
+            "id": f"audio_temp_{datetime.now().strftime('%Y%m%d_%H%M%S_%f')}",
             "tamanho_bytes": len(audio_bytes),
             "extensao": safe_extension,
+            "temporario": True,
+            "recebido_em": datetime.now().isoformat(timespec="seconds"),
+            "conteudo_bytes": audio_bytes,
         }
         self._last_saved_audio = saved_audio
         return saved_audio

@@ -15,7 +15,11 @@ class PlaceholderTranscriptionService:
             "rota": "/soletracao-palavras/transcrever",
             "modo": "provisorio",
             "mensagem": "Transcricao simulada com sucesso",
-            "audio": last_audio,
+            "audio": {
+                key: value
+                for key, value in last_audio.items()
+                if key != "conteudo_bytes"
+            },
             "texto_transcrito": recognized_text,
             "texto_normalizado": normalized_text,
             "observacao": (

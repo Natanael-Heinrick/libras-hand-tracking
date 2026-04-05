@@ -216,9 +216,12 @@ class HandTrackingHandler(BaseHTTPRequestHandler):
             return
 
         if route.startswith("/soletracao-palavras/audios/"):
-            audio_name = Path(parsed.path).name
-            audio_path = Path(__file__).resolve().parent / "soletracao_palavras" / "audios" / audio_name
-            self._send_binary_file(audio_path, "audio/webm")
+            self._send_json(
+                {
+                    "erro": "Os audios agora sao temporarios e nao ficam disponiveis para download."
+                },
+                status=410,
+            )
             return
 
         if route == "/camera/iniciar":
@@ -302,8 +305,12 @@ class HandTrackingHandler(BaseHTTPRequestHandler):
             self._send_json(
                 {
                     "rota": "/soletracao-palavras/audio",
-                    "mensagem": "Audio recebido com sucesso",
-                    "audio": saved_audio,
+                    "mensagem": "Audio recebido temporariamente com sucesso",
+                    "audio": {
+                        key: value
+                        for key, value in saved_audio.items()
+                        if key != "conteudo_bytes"
+                    },
                 },
                 status=201,
             )

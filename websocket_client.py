@@ -6,7 +6,7 @@ import cv2
 from websockets.asyncio.client import connect
 
 
-SERVER_URL = "ws://127.0.0.1:8765"
+SERVER_URL = "ws://127.0.0.1:8765/alfabeto"
 
 
 def encode_frame(frame, quality=70):
