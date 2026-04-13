@@ -1,285 +1,406 @@
-# 🧱 Estrutura do Projeto
+# 🧱 Estrutura do Projeto — Libras Hand Tracking
 
-[⬅️ Voltar para o README principal](/c:/Users/Natanael/OneDrive/Desktop/hand-tracking-project/README.md)
+[⬅️ Voltar para o README principal](https://github.com/Natanael-Heinrick/libras-hand-tracking/blob/main/README.md)
 
-Este documento apresenta a arquitetura geral do projeto, os principais diretórios e o papel de cada arquivo relevante.
+> 📖 Este documento apresenta a **arquitetura geral** do projeto, os principais diretórios, o papel de cada arquivo e como os módulos se conectam entre si.
+
+---
+
+## 📑 Sumário
+
+- [📌 Visão Geral](#-visão-geral)
+- [🗂️ Estrutura de Alto Nível](#️-estrutura-de-alto-nível)
+- [🧠 Núcleo de Hand Tracking](#-núcleo-de-hand-tracking)
+- [🌐 Camada HTTP](#-camada-http)
+- [🔌 Camada WebSocket](#-camada-websocket)
+- [🎤 Módulo `soletracao_palavras`](#-módulo-soletracao_palavras)
+- [🎮 Módulo `exercicios_libras`](#-módulo-exercicios_libras)
+- [🧪 Arquivos Auxiliares](#-arquivos-auxiliares)
+- [🗃️ Diretório `docs`](#️-diretório-docs)
+- [🔁 Relação entre os Módulos](#-relação-entre-os-módulos)
+- [⚠️ Observações Técnicas](#️-observações-técnicas)
+
+---
 
 ## 📌 Visão Geral
 
-O projeto está organizado hoje em duas frentes principais:
+O projeto está organizado em duas frentes principais:
 
-1. reconhecimento de letras e palavras por hand tracking com WebSocket
-2. soletração por voz com API HTTP, GIFs e tela web
+| # | 🎯 Frente                        | 📋 Descrição                                                                |
+|---|----------------------------------|-----------------------------------------------------------------------------|
+| 1 | **✋ Hand Tracking + WebSocket** | Reconhecimento de letras e palavras por gestos em tempo real via webcam      |
+| 2 | **🎤 Soletração por Voz**        | API HTTP com GIFs, áudio e tela web interativa para soletração por palavras |
 
-Além disso, existem alguns arquivos auxiliares e uma estrutura de documentação em `docs/`.
+> 💡 Além disso, existem arquivos auxiliares e uma estrutura de documentação organizada em `docs/`.
 
-## 🗂️ Estrutura de alto nível
+---
 
-Na raiz do projeto:
+## 🗂️ Estrutura de Alto Nível
 
-- [api_server.py](/c:/Users/Natanael/OneDrive/Desktop/hand-tracking-project/api_server.py)
-- [websocket_server.py](/c:/Users/Natanael/OneDrive/Desktop/hand-tracking-project/websocket_server.py)
-- [websocket_client.py](/c:/Users/Natanael/OneDrive/Desktop/hand-tracking-project/websocket_client.py)
-- [websocket_exercicios_client.py](/c:/Users/Natanael/OneDrive/Desktop/hand-tracking-project/websocket_exercicios_client.py)
-- [hand_tracking_service.py](/c:/Users/Natanael/OneDrive/Desktop/hand-tracking-project/hand_tracking_service.py)
-- [letter_classifier.py](/c:/Users/Natanael/OneDrive/Desktop/hand-tracking-project/letter_classifier.py)
-- [hand_geometry.py](/c:/Users/Natanael/OneDrive/Desktop/hand-tracking-project/hand_geometry.py)
-- [test_camera.py](/c:/Users/Natanael/OneDrive/Desktop/hand-tracking-project/test_camera.py)
-- [README.md](/c:/Users/Natanael/OneDrive/Desktop/hand-tracking-project/README.md)
+### 📁 Arquivos na raiz
 
-Diretórios principais:
+| 📄 Arquivo                           | 🎯 Função principal                                  |
+| ------------------------------------ | ----------------------------------------------------- |
+| `api_server.py`                      | 🌐 Servidor HTTP — rotas de soletração e hand tracking |
+| `websocket_server.py`                | 🔌 Servidor WebSocket — alfabeto e exercícios          |
+| `websocket_client.py`                | 📡 Cliente WebSocket — modo alfabeto                   |
+| `websocket_exercicios_client.py`     | 🎮 Cliente WebSocket — modo exercícios                 |
+| `hand_tracking_service.py`           | 🧠 Núcleo de detecção e estabilização de letras        |
+| `letter_classifier.py`              | 🔤 Regras de classificação de letras (estáticas/dinâmicas) |
+| `hand_geometry.py`                   | 📐 Funções geométricas auxiliares                      |
+| `test_camera.py`                     | 🧪 Script de teste da webcam                           |
+| `README.md`                          | 📖 Documentação principal do projeto                   |
 
-- [docs](/c:/Users/Natanael/OneDrive/Desktop/hand-tracking-project/docs)
-- [soletracao_palavras](/c:/Users/Natanael/OneDrive/Desktop/hand-tracking-project/soletracao_palavras)
-- [exercicios_libras](/c:/Users/Natanael/OneDrive/Desktop/hand-tracking-project/exercicios_libras)
-- [voice_to_libras](/c:/Users/Natanael/OneDrive/Desktop/hand-tracking-project/voice_to_libras)
+### 📂 Diretórios principais
 
-## 🧠 Núcleo de hand tracking
+| 📁 Diretório           | 🎯 Função                                              |
+| ---------------------- | ------------------------------------------------------- |
+| `docs/`                | 📚 Documentação técnica detalhada                       |
+| `soletracao_palavras/` | 🎤 Módulo de soletração por voz e GIFs                  |
+| `exercicios_libras/`   | 🎮 Módulo do modo exercícios (jogo)                     |
+| `voice_to_libras/`     | 🔬 Estrutura conceitual de voz para LIBRAS (em progresso) |
 
-Esses arquivos formam a base do reconhecimento de letras por gesto.
+---
 
-### [hand_tracking_service.py](/c:/Users/Natanael/OneDrive/Desktop/hand-tracking-project/hand_tracking_service.py)
+## 🧠 Núcleo de Hand Tracking
 
-Responsável por:
+> Esses arquivos formam a **base do reconhecimento de letras por gesto** e são reutilizados tanto pelo fluxo HTTP quanto pelo WebSocket.
 
-- receber e processar frames
-- usar MediaPipe para detectar mãos
-- estabilizar letras detectadas
-- manter a palavra sendo montada
+---
 
-É o núcleo que alimenta tanto:
+### 🧠 `hand_tracking_service.py`
 
-- o fluxo HTTP de hand tracking
-- o fluxo WebSocket
+> Núcleo central que alimenta **todos os fluxos** do projeto.
 
-### [letter_classifier.py](/c:/Users/Natanael/OneDrive/Desktop/hand-tracking-project/letter_classifier.py)
+| 🎯 Responsabilidade                                      |
+| --------------------------------------------------------- |
+| 📷 Receber e processar frames da webcam                   |
+| 🖐️ Usar **MediaPipe** para detectar mãos                  |
+| 🔤 Estabilizar letras detectadas (filtro temporal)         |
+| 📝 Manter a palavra sendo montada em tempo real           |
 
-Responsável por:
+> 🔗 É usado por: `api_server.py` (HTTP) e `websocket_server.py` (WebSocket)
 
-- implementar regras de classificação das letras
-- tratar letras estáticas
-- tratar letras dinâmicas como `H`, `J`, `K` e `W`
+---
 
-Esse arquivo concentra a lógica mais específica de reconhecimento.
+### 🔤 `letter_classifier.py`
 
-### [hand_geometry.py](/c:/Users/Natanael/OneDrive/Desktop/hand-tracking-project/hand_geometry.py)
+> Concentra a **lógica de reconhecimento** de cada letra em LIBRAS.
 
-Responsável por:
+| 🎯 Responsabilidade                                      |
+| --------------------------------------------------------- |
+| 📏 Implementar regras de classificação por posição dos dedos |
+| ✋ Tratar letras **estáticas** (posição fixa da mão)       |
+| 🤟 Tratar letras **dinâmicas** como `H`, `J`, `K` e `W`  |
 
-- funções geométricas auxiliares
-- cálculo de distâncias
-- apoio à classificação dos dedos e posições da mão
+---
+
+### 📐 `hand_geometry.py`
+
+> Funções **geométricas auxiliares** usadas pela classificação.
+
+| 🎯 Responsabilidade                                      |
+| --------------------------------------------------------- |
+| 📏 Cálculo de distâncias entre pontos da mão              |
+| 🖐️ Apoio à classificação de dedos e posições              |
+| 🔢 Funções matemáticas reutilizáveis                      |
+
+---
 
 ## 🌐 Camada HTTP
 
-Responsável pela parte de soletração por voz, tela web e rotas de apoio.
+> Responsável pela parte de **soletração por voz**, tela web e rotas de apoio.
 
-### [api_server.py](/c:/Users/Natanael/OneDrive/Desktop/hand-tracking-project/api_server.py)
+---
 
-É o ponto de entrada do servidor HTTP.
+### 🌐 `api_server.py`
 
-Responsável por:
+> **Ponto de entrada** do servidor HTTP.
 
-- expor as rotas da API local
-- entregar a tela web de soletração
-- servir GIFs e áudios locais
-- iniciar e acompanhar sessões de soletração
-- integrar hand tracking em rotas de consulta e teste
+| 🎯 Responsabilidade                                      |
+| --------------------------------------------------------- |
+| 🛣️ Expor as rotas da API local                            |
+| 🖥️ Entregar a tela web de soletração                      |
+| 🖼️ Servir GIFs e áudios locais                            |
+| ▶️ Iniciar e acompanhar sessões de soletração              |
+| 🧪 Integrar hand tracking em rotas de consulta e teste    |
+
+> 📖 Documentação completa das rotas: [`docs/api.md`](./docs/api.md)
+
+---
 
 ## 🔌 Camada WebSocket
 
-Responsável pela comunicação em tempo real da webcam com o servidor.
+> Responsável pela **comunicação em tempo real** da webcam com o servidor.
 
-### [websocket_server.py](/c:/Users/Natanael/OneDrive/Desktop/hand-tracking-project/websocket_server.py)
+---
 
-É o ponto de entrada do servidor WebSocket.
+### 🔌 `websocket_server.py`
 
-Responsável por:
+> **Ponto de entrada** do servidor WebSocket.
 
-- receber frames da webcam em base64
-- processar os frames com `HandTrackingService`
-- responder com estado atualizado
-- expor duas rotas:
-  - `/alfabeto`
-  - `/exercicios`
+| 🎯 Responsabilidade                                      |
+| --------------------------------------------------------- |
+| 📡 Receber frames da webcam em base64                     |
+| 🧠 Processar os frames com `HandTrackingService`          |
+| 📤 Responder com estado atualizado                        |
 
-### [websocket_client.py](/c:/Users/Natanael/OneDrive/Desktop/hand-tracking-project/websocket_client.py)
+**🛣️ Rotas expostas:**
 
-Cliente do modo alfabeto.
+| Rota           | 📋 Descrição                          |
+| -------------- | ------------------------------------- |
+| `/alfabeto`    | 🔤 Modo reconhecimento de letras      |
+| `/exercicios`  | 🎮 Modo jogo de exercícios            |
 
-Responsável por:
+---
 
-- abrir a webcam
-- codificar o frame em base64
-- enviar frames ao servidor
-- exibir a letra e a palavra reconhecida
+### 📡 `websocket_client.py`
 
-### [websocket_exercicios_client.py](/c:/Users/Natanael/OneDrive/Desktop/hand-tracking-project/websocket_exercicios_client.py)
+> Cliente do **modo alfabeto**.
 
-Cliente do modo exercícios.
+| 🎯 Responsabilidade                                      |
+| --------------------------------------------------------- |
+| 📷 Abrir a webcam                                         |
+| 🔄 Codificar o frame em base64                            |
+| 📤 Enviar frames ao servidor                              |
+| 🔤 Exibir a letra e a palavra reconhecida                 |
 
-Responsável por:
+---
 
-- abrir a webcam
-- enviar frames ao servidor
-- exibir o estado do jogo
-- mostrar palavra alvo, pontuação, nível e feedback
+### 🎮 `websocket_exercicios_client.py`
+
+> Cliente do **modo exercícios**.
+
+| 🎯 Responsabilidade                                      |
+| --------------------------------------------------------- |
+| 📷 Abrir a webcam                                         |
+| 📤 Enviar frames ao servidor                              |
+| 🎯 Exibir o estado do jogo                                |
+| 📊 Mostrar palavra alvo, pontuação, nível e feedback      |
+
+---
 
 ## 🎤 Módulo `soletracao_palavras`
 
-Diretório:
+> 📁 Diretório: `soletracao_palavras/`
+>
+> Concentra o **fluxo HTTP de soletração por voz e GIFs**.
 
-- [soletracao_palavras](/c:/Users/Natanael/OneDrive/Desktop/hand-tracking-project/soletracao_palavras)
+---
 
-Esse módulo concentra o fluxo HTTP de soletração por voz e GIFs.
+### 📄 Arquivos principais
 
-### Arquivos principais
+| 📄 Arquivo                | 🎯 Função                                      |
+| ------------------------- | ----------------------------------------------- |
+| `service.py`              | 🔤 Separação de frases, palavras e letras        |
+| `audio_service.py`        | 🎙️ Salvamento e referência de áudios             |
+| `transcription_service.py`| 🧠 Transcrição provisória do backend             |
+| `tela.html`               | 🖥️ Interface de teste no navegador               |
+| `__init__.py`             | 📦 Inicializador do módulo Python                |
 
-- [soletracao_palavras/service.py](/c:/Users/Natanael/OneDrive/Desktop/hand-tracking-project/soletracao_palavras/service.py)
-- [soletracao_palavras/audio_service.py](/c:/Users/Natanael/OneDrive/Desktop/hand-tracking-project/soletracao_palavras/audio_service.py)
-- [soletracao_palavras/transcription_service.py](/c:/Users/Natanael/OneDrive/Desktop/hand-tracking-project/soletracao_palavras/transcription_service.py)
-- [soletracao_palavras/tela.html](/c:/Users/Natanael/OneDrive/Desktop/hand-tracking-project/soletracao_palavras/tela.html)
-- [soletracao_palavras/__init__.py](/c:/Users/Natanael/OneDrive/Desktop/hand-tracking-project/soletracao_palavras/__init__.py)
+### 📂 Subpastas
 
-### Subpastas importantes
+| 📁 Pasta   | 🎯 Função                                 |
+| ---------- | ------------------------------------------ |
+| `gifs/`    | 🖼️ Base local de GIFs por letra            |
+| `audios/`  | 🔊 Arquivos de áudio enviados pela tela    |
 
-- [soletracao_palavras/gifs](/c:/Users/Natanael/OneDrive/Desktop/hand-tracking-project/soletracao_palavras/gifs)
-  Base local de GIFs por letra.
-- [soletracao_palavras/audios](/c:/Users/Natanael/OneDrive/Desktop/hand-tracking-project/soletracao_palavras/audios)
-  Arquivos de áudio enviados pela tela.
+---
 
-### Papel de cada arquivo
+### 🔍 Papel detalhado de cada arquivo
 
-#### [soletracao_palavras/service.py](/c:/Users/Natanael/OneDrive/Desktop/hand-tracking-project/soletracao_palavras/service.py)
+#### 🔤 `service.py`
 
-Responsável por:
+| 🎯 Responsabilidade                                      |
+| --------------------------------------------------------- |
+| ✂️ Separar frases em palavras                              |
+| 🔤 Separar palavras em letras                             |
+| 📊 Montar grupos visuais para exibição                    |
+| ▶️ Controlar a reprodução com `hold` e `continue`         |
 
-- separar frases em palavras
-- separar palavras em letras
-- montar grupos visuais
-- controlar a reprodução com `hold` e `continue`
+#### 🎙️ `audio_service.py`
 
-#### [soletracao_palavras/audio_service.py](/c:/Users/Natanael/OneDrive/Desktop/hand-tracking-project/soletracao_palavras/audio_service.py)
+| 🎯 Responsabilidade                                      |
+| --------------------------------------------------------- |
+| 💾 Salvar o áudio enviado pela tela web                   |
+| 📎 Guardar referência do último áudio salvo               |
 
-Responsável por:
+#### 🧠 `transcription_service.py`
 
-- salvar o áudio enviado pela tela
-- guardar referência do último áudio salvo
+| 🎯 Responsabilidade                                      |
+| --------------------------------------------------------- |
+| 🔄 Oferecer transcrição provisória no backend             |
+| 🧪 Validar o fluxo antes da integração real               |
 
-#### [soletracao_palavras/transcription_service.py](/c:/Users/Natanael/OneDrive/Desktop/hand-tracking-project/soletracao_palavras/transcription_service.py)
+#### 🖥️ `tela.html`
 
-Responsável por:
+| 🎯 Responsabilidade                                      |
+| --------------------------------------------------------- |
+| 🌐 Interface de teste no navegador                        |
+| 🎙️ Captura de áudio via Web API                           |
+| 🗣️ Reconhecimento de fala no navegador (`Web Speech API`) |
+| 🖼️ Exibição dos GIFs de letras em tempo real              |
 
-- oferecer uma transcrição provisória no backend para validar o fluxo
-
-#### [soletracao_palavras/tela.html](/c:/Users/Natanael/OneDrive/Desktop/hand-tracking-project/soletracao_palavras/tela.html)
-
-Responsável por:
-
-- interface de teste no navegador
-- captura de áudio
-- reconhecimento de fala no navegador
-- exibição dos GIFs
+---
 
 ## 🎮 Módulo `exercicios_libras`
 
-Diretório:
+> 📁 Diretório: `exercicios_libras/`
+>
+> Concentra a **lógica do modo exercícios** (jogo de soletração).
 
-- [exercicios_libras](/c:/Users/Natanael/OneDrive/Desktop/hand-tracking-project/exercicios_libras)
+---
 
-Esse módulo concentra a lógica do modo exercícios.
+### 📄 Arquivos principais
 
-### Arquivos principais
+| 📄 Arquivo                             | 🎯 Função                            |
+| -------------------------------------- | ------------------------------------- |
+| `service.py`                           | 🎮 Lógica do jogo de exercícios       |
+| `__init__.py`                          | 📦 Inicializador do módulo             |
+| `README.md`                            | 📖 Documentação do módulo              |
 
-- [exercicios_libras/service.py](/c:/Users/Natanael/OneDrive/Desktop/hand-tracking-project/exercicios_libras/service.py)
-- [exercicios_libras/__init__.py](/c:/Users/Natanael/OneDrive/Desktop/hand-tracking-project/exercicios_libras/__init__.py)
-- [exercicios_libras/README.md](/c:/Users/Natanael/OneDrive/Desktop/hand-tracking-project/exercicios_libras/README.md)
+### 🗄️ Base de dados
 
-### Base de dados
+| 📄 Arquivo                                  | 🎯 Função                         |
+| ------------------------------------------- | ---------------------------------- |
+| `dados/palavras_libras_filtrado.csv`         | 📋 Palavras usadas no modo jogo    |
 
-- [exercicios_libras/dados/palavras_libras_filtrado.csv](/c:/Users/Natanael/OneDrive/Desktop/hand-tracking-project/exercicios_libras/dados/palavras_libras_filtrado.csv)
+---
 
-### Papel do serviço
+### 🔍 Papel do serviço (`service.py`)
 
-[exercicios_libras/service.py](/c:/Users/Natanael/OneDrive/Desktop/hand-tracking-project/exercicios_libras/service.py) é responsável por:
+| 🎯 Responsabilidade                                      |
+| --------------------------------------------------------- |
+| 📋 Carregar palavras do CSV                               |
+| 🎯 Filtrar por dificuldade (`facil`, `medio`, `dificil`)  |
+| 📊 Controlar pontuação e calcular nível                   |
+| 📝 Registrar última palavra concluída                     |
+| 🎲 Escolher nova palavra aleatória (sem repetição imediata) |
 
-- carregar palavras do CSV
-- filtrar por dificuldade
-- controlar pontuação
-- calcular nível
-- registrar última palavra concluída
-- escolher nova palavra aleatória
+---
 
-## 🧪 Arquivos auxiliares
+## 🧪 Arquivos Auxiliares
 
-### [test_camera.py](/c:/Users/Natanael/OneDrive/Desktop/hand-tracking-project/test_camera.py)
+---
 
-Script simples para testar se a webcam abre corretamente.
+### 🧪 `test_camera.py`
 
-### [hand_tracking.py](/c:/Users/Natanael/OneDrive/Desktop/hand-tracking-project/hand_tracking.py)
+> Script simples para **testar se a webcam abre corretamente**.
 
-Arquivo relacionado à camada de hand tracking, mas hoje não é o principal ponto de entrada do sistema.
+---
 
-### [voice_to_libras](/c:/Users/Natanael/OneDrive/Desktop/hand-tracking-project/voice_to_libras)
+### 📄 `hand_tracking.py`
 
-Diretório com estrutura inicial conceitual para uma trilha de voz para LIBRAS.
+> Arquivo relacionado à camada de hand tracking, mas **não é o principal ponto de entrada** do sistema atualmente.
 
-Hoje ele não é o núcleo do fluxo principal ativo.
+---
 
-Arquivos relacionados:
+### 📁 `voice_to_libras/`
 
-- [voice_to_libras_demo.py](/c:/Users/Natanael/OneDrive/Desktop/hand-tracking-project/voice_to_libras_demo.py)
-- [VOICE_TO_LIBRAS_PLAN.md](/c:/Users/Natanael/OneDrive/Desktop/hand-tracking-project/VOICE_TO_LIBRAS_PLAN.md)
+> Diretório com **estrutura inicial conceitual** para uma trilha de voz para LIBRAS.
+
+> ⚠️ Hoje **não é o núcleo do fluxo principal** ativo.
+
+**📄 Arquivos relacionados:**
+
+| 📄 Arquivo                    | 🎯 Função                              |
+| ----------------------------- | --------------------------------------- |
+| `voice_to_libras_demo.py`     | 🔬 Demo conceitual de voz para LIBRAS   |
+| `VOICE_TO_LIBRAS_PLAN.md`     | 📋 Plano de desenvolvimento da feature  |
+
+---
 
 ## 🗃️ Diretório `docs`
 
-Diretório:
+> 📁 Diretório: `docs/`
+>
+> Centraliza a **documentação técnica** do projeto, separando o README principal dos detalhes específicos.
 
-- [docs](/c:/Users/Natanael/OneDrive/Desktop/hand-tracking-project/docs)
+### 📚 Documentos disponíveis
 
-Função:
+| 📄 Documento             | 🎯 Conteúdo                              |
+| ------------------------ | ----------------------------------------- |
+| `api.md`                 | 🌐 Documentação da API HTTP               |
+| `websocket.md`           | 🔌 Documentação do WebSocket               |
+| `exercicios.md`          | 🎮 Documentação do modo exercícios         |
+| `soletracao-voz.md`      | 🎤 Documentação da soletração por voz      |
+| `instalacao.md`          | ⚙️ Guia de instalação                      |
+| `estrutura-projeto.md`   | 🧱 Este documento (estrutura do projeto)   |
 
-- centralizar a documentação técnica do projeto
-- separar o README principal dos detalhes específicos
+---
 
-Documentos atuais:
+## 🔁 Relação entre os Módulos
 
-- [docs/api.md](/c:/Users/Natanael/OneDrive/Desktop/hand-tracking-project/docs/api.md)
-- [docs/websocket.md](/c:/Users/Natanael/OneDrive/Desktop/hand-tracking-project/docs/websocket.md)
-- [docs/exercicios.md](/c:/Users/Natanael/OneDrive/Desktop/hand-tracking-project/docs/exercicios.md)
-- [docs/soletracao-voz.md](/c:/Users/Natanael/OneDrive/Desktop/hand-tracking-project/docs/soletracao-voz.md)
-- [docs/instalacao.md](/c:/Users/Natanael/OneDrive/Desktop/hand-tracking-project/docs/instalacao.md)
-- [docs/estrutura-projeto.md](/c:/Users/Natanael/OneDrive/Desktop/hand-tracking-project/docs/estrutura-projeto.md)
+### 🔌 Fluxo WebSocket
 
-## 🔁 Relação entre os módulos
+```
+📷 websocket_client.py / websocket_exercicios_client.py
+    │
+    │ 📤 envia frame (base64)
+    ▼
+🔌 websocket_server.py
+    │
+    │ 🧠 processa frame
+    ▼
+🧠 hand_tracking_service.py
+    │
+    │ 🔤 classifica letra
+    ▼
+🔤 letter_classifier.py
+    │
+    │ 📤 retorna estado
+    ▼
+📡 Cliente recebe resposta atualizada
+```
 
-### Fluxo WebSocket
+---
 
-1. `websocket_client.py` ou `websocket_exercicios_client.py` captura a webcam
-2. envia o frame para `websocket_server.py`
-3. `websocket_server.py` usa `hand_tracking_service.py`
-4. `hand_tracking_service.py` usa `letter_classifier.py`
-5. o servidor responde com o estado atualizado
+### 🌐 Fluxo HTTP
 
-### Fluxo HTTP
+```
+🌐 Requisição HTTP
+    │
+    ▼
+🌐 api_server.py
+    │
+    │ 🎤 usa serviços
+    ▼
+📦 soletracao_palavras/ (service, audio, transcription)
+    │
+    │ 📤 retorna
+    ▼
+📄 JSON / 🖼️ GIFs / 🔊 Áudios / 🖥️ HTML
+```
 
-1. `api_server.py` recebe a requisição
-2. usa serviços de `soletracao_palavras`
-3. entrega JSON, GIFs, áudios ou HTML
-4. a interface `tela.html` coordena a experiência no navegador
+---
 
-### Fluxo de exercícios
+### 🎮 Fluxo de Exercícios
 
-1. `websocket_server.py` recebe ações do cliente de exercícios
-2. usa `hand_tracking_service.py` para as letras
-3. usa `exercicios_libras/service.py` para a lógica do jogo
-4. devolve `estado` e `exercicio` no mesmo payload
+```
+🎮 websocket_exercicios_client.py
+    │
+    │ 📤 envia frame + ações
+    ▼
+🔌 websocket_server.py
+    │
+    ├── 🧠 hand_tracking_service.py (letras)
+    │
+    ├── 🎮 exercicios_libras/service.py (lógica do jogo)
+    │
+    │ 📤 retorna estado + exercicio
+    ▼
+🎮 Cliente recebe payload unificado
+```
 
-## ⚠️ Observações técnicas
+---
 
-- O projeto ainda combina HTTP e WebSocket no mesmo repositório.
-- Isso é coerente para a fase atual, mas no futuro pode valer separar mais claramente as camadas.
-- Pastas como `__pycache__` e `venv` não fazem parte da lógica do projeto.
-- A documentação em `docs/` existe justamente para facilitar a leitura dessa estrutura por novos colaboradores.
+## ⚠️ Observações Técnicas
 
-[⬅️ Voltar para o README principal](/c:/Users/Natanael/OneDrive/Desktop/hand-tracking-project/README.md)
+- ⚙️ O projeto ainda combina **HTTP e WebSocket** no mesmo repositório — coerente para a fase atual.
+- 🔮 No futuro, pode valer separar mais claramente as camadas (ex: microsserviços).
+- 🚫 Pastas como `__pycache__` e `venv` **não fazem parte** da lógica do projeto.
+- 📚 A documentação em `docs/` existe para facilitar a leitura da estrutura por **novos colaboradores**.
+
+---
+
+[⬅️ Voltar para o README principal](https://github.com/Natanael-Heinrick/libras-hand-tracking/blob/main/README.md)

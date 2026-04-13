@@ -1,80 +1,100 @@
-# 🌐 API HTTP
+# 🌐 API — Libras Hand Tracking
 
-[⬅️ Voltar para o README principal](/c:/Users/Natanael/OneDrive/Desktop/hand-tracking-project/README.md)
+[⬅️ Voltar para o README principal](https://github.com/Natanael-Heinrick/libras-hand-tracking/blob/main/README.md)
 
-Este documento descreve a API HTTP do projeto, incluindo:
+> 📖 Documentação completa da API HTTP do projeto **Libras Hand Tracking**, incluindo rotas, métodos, parâmetros, códigos de resposta e exemplos práticos com `curl`.
 
-- rotas disponíveis
-- métodos
-- parâmetros
-- respostas esperadas
-- exemplos de uso
+---
 
-## 📌 Visão Geral
+## 📑 Sumário
 
-Arquivo principal da API:
+- [🔍 Visão Geral](#-visão-geral)
+- [▶️ Como Subir a API](#️-como-subir-a-api)
+- [🔓 Autenticação](#-autenticação)
+- [📦 Formato de Resposta](#-formato-de-resposta)
+- [🗺️ Rotas](#️-rotas)
+  - [🏠 Geral](#-geral)
+  - [✋ Hand Tracking](#-hand-tracking)
+  - [📝 Soletração por Palavras](#-soletração-por-palavras)
+- [📊 Códigos de Status HTTP](#-códigos-de-status-http)
+- [🧪 Fluxos de Teste Recomendados](#-fluxos-de-teste-recomendados)
+- [⚠️ Observações Técnicas](#️-observações-técnicas)
 
-- [api_server.py](/c:/Users/Natanael/OneDrive/Desktop/hand-tracking-project/api_server.py)
+---
 
-Endereço base:
+## 🔍 Visão Geral
 
-```text
-http://127.0.0.1:8000
-```
+| 🏷️ Item           | 📋 Valor                                                                                                       |
+| ------------------ | --------------------------------------------------------------------------------------------------------------- |
+| **📁 Arquivo**     | [`api_server.py`](https://github.com/Natanael-Heinrick/libras-hand-tracking/blob/main/api_server.py)            |
+| **🌍 Base URL**    | `http://127.0.0.1:8000`                                                                                        |
+| **⚙️ Servidor**    | `ThreadingHTTPServer` (stdlib)                                                                                  |
+| **📄 Formato**     | JSON (exceto rotas de stream, arquivos estáticos e HTML)                                                        |
 
-A API atualmente atende dois contextos principais:
+A API cobre dois domínios:
 
-1. consulta e controle do fluxo de hand tracking
-2. soletração por palavras com GIFs, áudio e tela web
+| # | 🎯 Domínio                     | 📋 Descrição                                                                  |
+|---|--------------------------------|-------------------------------------------------------------------------------|
+| 1 | **✋ Hand Tracking**            | Controle de câmera, reconhecimento de letras em Libras e consulta de estado   |
+| 2 | **📝 Soletração por Palavras** | Decomposição de texto em letras, reprodução com GIFs/áudio e tela web interativa |
 
-## ▶️ Como subir a API
+---
 
-No terminal:
+## ▶️ Como Subir a API
 
-```powershell
+```bash
 python api_server.py
 ```
 
-Quando o servidor subir, ele libera as rotas documentadas abaixo.
+> 💡 Após a inicialização, todas as rotas ficam disponíveis em `http://127.0.0.1:8000`.
 
-## 🧭 Índice de Rotas
+---
 
-### Rotas gerais
+## 🔓 Autenticação
 
-- `GET /`
+A API **não exige autenticação**. Todas as rotas são públicas e acessíveis localmente.
 
-### Rotas de hand tracking
+---
 
-- `GET /alfabeto`
-- `GET /estado`
-- `GET /camera/iniciar`
-- `GET /camera/parar`
-- `GET /camera/stream`
-- `GET /teste/a`
-- `GET /teste/letra/A`
+## 📦 Formato de Resposta
 
-### Rotas de soletração por palavras
+Salvo indicação em contrário, todas as respostas são retornadas em **JSON** com `Content-Type: application/json`.
 
-- `GET /soletracao-palavras?texto=oi`
-- `GET /soletracao-palavras/iniciar?texto=oi`
-- `GET /soletracao-palavras/status`
-- `GET /soletracao-palavras/tela`
-- `GET /soletracao-palavras/gifs/<arquivo>`
-- `GET /soletracao-palavras/audios/<arquivo>`
-- `POST /soletracao-palavras/audio`
-- `POST /soletracao-palavras/transcrever`
+⚠️ **Exceções:**
 
-## 🏠 `GET /`
+| 🛣️ Rota                                | 📄 Content-Type                  |
+| ---------------------------------------- | -------------------------------- |
+| `GET /camera/stream`                     | `multipart/x-mixed-replace`     |
+| `GET /soletracao-palavras/tela`          | `text/html`                     |
+| `GET /soletracao-palavras/gifs/...`      | `image/gif`                     |
+| `GET /soletracao-palavras/audios/...`    | depende do formato do arquivo    |
 
-### Finalidade
+---
 
-Retorna uma resposta simples informando que a API está ativa e lista as principais rotas.
+## 🗺️ Rotas
 
-### Parâmetros
+### 🏠 Geral
 
-Nenhum.
+---
 
-### Resposta esperada
+#### 🏠 `GET /`
+
+> Verifica se a API está ativa e lista as principais rotas disponíveis.
+
+**📥 Parâmetros:** nenhum
+
+**📤 Resposta:**
+
+| Campo      | Tipo       | Descrição                           |
+| ---------- | ---------- | ----------------------------------- |
+| `mensagem` | `string`   | Confirmação de que a API está ativa |
+| `rotas`    | `string[]` | Lista das rotas principais          |
+
+**💻 Exemplo:**
+
+```bash
+curl http://127.0.0.1:8000/
+```
 
 ```json
 {
@@ -87,76 +107,79 @@ Nenhum.
 }
 ```
 
-### Exemplo de uso
+---
 
-```text
-http://127.0.0.1:8000/
+### ✋ Hand Tracking
+
+---
+
+#### 🔤 `GET /alfabeto`
+
+> Consulta o estado atual do modo alfabeto, incluindo letras suportadas e estado da câmera.
+
+**📥 Parâmetros:** nenhum
+
+**📤 Resposta:**
+
+| Campo                      | Tipo       | Descrição                                   |
+| -------------------------- | ---------- | ------------------------------------------- |
+| `rota`                     | `string`   | Rota chamada                                |
+| `letras_suportadas`        | `string[]` | Lista de letras reconhecidas pelo modelo     |
+| `camera_ativa`             | `boolean`  | Se a webcam está ligada                     |
+| `estado_atual`             | `object`   | Último estado detectado pelo hand tracking  |
+| `observacao`               | `string`   | Informações adicionais                      |
+| `query_params_recebidos`   | `object`   | Query params enviados na requisição         |
+
+**💻 Exemplo:**
+
+```bash
+curl http://127.0.0.1:8000/alfabeto
 ```
 
-## ✋ `GET /alfabeto`
+---
 
-### Finalidade
+#### 📊 `GET /estado`
 
-Consulta o estado atual do modo alfabeto, incluindo letras suportadas e estado da câmera.
+> Retorna o estado mais recente detectado pelo serviço de hand tracking.
 
-### Parâmetros
+**📥 Parâmetros:** nenhum
 
-Nenhum obrigatório.
+**📤 Resposta:**
 
-### Resposta esperada
+| Campo             | Tipo       | Descrição                                  |
+| ----------------- | ---------- | ------------------------------------------ |
+| `letra`           | `string`   | Letra detectada no frame atual             |
+| `letra_estavel`   | `string`   | Letra estabilizada após filtro temporal    |
+| `palavra`         | `string`   | Palavra acumulada até o momento            |
+| `maos_detectadas` | `integer`  | Quantidade de mãos visíveis na câmera      |
+| `deteccoes`       | `object[]` | Detalhes de cada mão detectada             |
 
-Campos principais:
+**💻 Exemplo:**
 
-- `rota`
-- `letras_suportadas`
-- `camera_ativa`
-- `estado_atual`
-- `observacao`
-- `query_params_recebidos`
-
-### Exemplo de uso
-
-```text
-http://127.0.0.1:8000/alfabeto
+```bash
+curl http://127.0.0.1:8000/estado
 ```
 
-## 📊 `GET /estado`
+---
 
-### Finalidade
+#### 📷 `GET /camera/iniciar`
 
-Retorna somente o estado atual detectado pelo serviço de hand tracking.
+> Inicia a captura da webcam pelo serviço de hand tracking.
 
-### Parâmetros
+**📥 Parâmetros:** nenhum
 
-Nenhum.
+**📤 Resposta:**
 
-### Resposta esperada
+| Campo          | Tipo      | Descrição                     |
+| -------------- | --------- | ----------------------------- |
+| `mensagem`     | `string`  | Mensagem de confirmação       |
+| `camera_ativa` | `boolean` | `true` se iniciada com êxito  |
 
-Campos comuns:
+**💻 Exemplo:**
 
-- `letra`
-- `letra_estavel`
-- `palavra`
-- `maos_detectadas`
-- `deteccoes`
-
-### Exemplo de uso
-
-```text
-http://127.0.0.1:8000/estado
+```bash
+curl http://127.0.0.1:8000/camera/iniciar
 ```
-
-## 📷 `GET /camera/iniciar`
-
-### Finalidade
-
-Solicita a abertura da webcam pelo serviço.
-
-### Parâmetros
-
-Nenhum.
-
-### Resposta esperada
 
 ```json
 {
@@ -165,23 +188,26 @@ Nenhum.
 }
 ```
 
-### Exemplo de uso
+---
 
-```text
-http://127.0.0.1:8000/camera/iniciar
+#### 🛑 `GET /camera/parar`
+
+> Encerra a captura da webcam.
+
+**📥 Parâmetros:** nenhum
+
+**📤 Resposta:**
+
+| Campo          | Tipo      | Descrição                       |
+| -------------- | --------- | ------------------------------- |
+| `mensagem`     | `string`  | Mensagem de confirmação         |
+| `camera_ativa` | `boolean` | `false` se encerrada com êxito  |
+
+**💻 Exemplo:**
+
+```bash
+curl http://127.0.0.1:8000/camera/parar
 ```
-
-## 🛑 `GET /camera/parar`
-
-### Finalidade
-
-Encerra o uso da webcam pelo serviço.
-
-### Parâmetros
-
-Nenhum.
-
-### Resposta esperada
 
 ```json
 {
@@ -190,112 +216,114 @@ Nenhum.
 }
 ```
 
-### Exemplo de uso
+---
 
-```text
-http://127.0.0.1:8000/camera/parar
-```
+#### 🎥 `GET /camera/stream`
 
-## 🎥 `GET /camera/stream`
+> Abre um stream MJPEG da câmera com o processamento de hand tracking aplicado.
 
-### Finalidade
+**📥 Parâmetros:** nenhum
 
-Abre um stream MJPEG da câmera processada.
+**📤 Resposta:** `multipart/x-mixed-replace` com frames JPEG em sequência.
 
-### Parâmetros
+> 💡 **Dica:** abra esta URL diretamente no navegador ou use em uma tag `<img>` para visualizar o stream em tempo real.
 
-Nenhum.
+**💻 Exemplo:**
 
-### Resposta esperada
-
-- tipo de conteúdo `multipart/x-mixed-replace`
-- frames JPEG em sequência
-
-### Exemplo de uso
-
-```text
+```bash
+# 🌐 Abrir no navegador
 http://127.0.0.1:8000/camera/stream
+
+# 🖼️ Ou usar em HTML
+# <img src="http://127.0.0.1:8000/camera/stream" />
 ```
 
-## 🧪 `GET /teste/a`
+---
 
-### Finalidade
+#### 🧪 `GET /teste/a`
 
-Executa um teste específico para a letra `A`.
+> Executa um teste automatizado de reconhecimento específico para a letra **A**.
 
-### Parâmetros
+**📥 Parâmetros:** nenhum
 
-Nenhum.
+**📤 Códigos de resposta:**
 
-### Resposta esperada
+| Status | 🏷️   | Descrição                                |
+| ------ | ----- | ---------------------------------------- |
+| `200`  | ✅    | Letra reconhecida com sucesso            |
+| `408`  | ⏱️    | Timeout — letra não reconhecida a tempo  |
 
-O retorno depende do reconhecimento:
+**💻 Exemplo:**
 
-- sucesso: status `200`
-- timeout/falha: status `408`
-
-### Exemplo de uso
-
-```text
-http://127.0.0.1:8000/teste/a
+```bash
+curl http://127.0.0.1:8000/teste/a
 ```
 
-## 🔤 `GET /teste/letra/A`
+---
 
-### Finalidade
+#### 🔤 `GET /teste/letra/{letra}`
 
-Executa um teste de reconhecimento para uma letra específica suportada.
+> Executa um teste de reconhecimento para uma letra específica suportada pelo modelo.
 
-### Parâmetros
+**📥 Parâmetro de rota:**
 
-Na própria rota:
+| Parâmetro | Tipo     | Obrigatório | Descrição                       |
+| --------- | -------- | ----------- | ------------------------------- |
+| `letra`   | `string` | ✅ sim      | Letra maiúscula a ser testada   |
 
-- `A`, `C`, `D`, `E`, `F`, `G`, `I`, `J`, `K`, `M`, `N`, `O`, `P`, `R`, `S`, `T`, `U`, `V`
+**🔠 Letras suportadas:**
 
-### Resposta esperada
+> `A` · `C` · `D` · `E` · `F` · `G` · `I` · `J` · `K` · `M` · `N` · `O` · `P` · `R` · `S` · `T` · `U` · `V`
 
-- sucesso: status `200`
-- timeout/falha: status `408`
-- letra inválida: status `400`
+**📤 Códigos de resposta:**
 
-### Exemplo de uso
+| Status | 🏷️   | Descrição                           |
+| ------ | ----- | ----------------------------------- |
+| `200`  | ✅    | Letra reconhecida com sucesso       |
+| `400`  | ❌    | Letra inválida / não suportada      |
+| `408`  | ⏱️    | Timeout — não reconhecida a tempo   |
 
-```text
-http://127.0.0.1:8000/teste/letra/O
+**💻 Exemplo:**
+
+```bash
+curl http://127.0.0.1:8000/teste/letra/O
 ```
 
-## 📝 `GET /soletracao-palavras?texto=oi`
+---
 
-### Finalidade
+### 📝 Soletração por Palavras
 
-Recebe um texto e devolve a estrutura de soletração por palavras e letras.
+---
 
-### Parâmetros
+#### 📝 `GET /soletracao-palavras`
 
-Query param obrigatório:
+> Recebe um texto e devolve a estrutura completa de soletração, decomposta em palavras e letras.
 
-- `texto`
+**📥 Query params:**
 
-Exemplo:
+| Parâmetro | Tipo     | Obrigatório | Descrição         |
+| --------- | -------- | ----------- | ----------------- |
+| `texto`   | `string` | ✅ sim      | Texto a soletrar  |
 
-- `?texto=oi`
-- `?texto=oi tudo bem`
+**📤 Resposta:**
 
-### Resposta esperada
+| Campo              | Tipo       | Descrição                                     |
+| ------------------ | ---------- | --------------------------------------------- |
+| `rota`             | `string`   | Rota chamada                                  |
+| `texto_original`   | `string`   | Texto enviado sem alterações                  |
+| `texto_normalizado`| `string`   | Texto em maiúsculas, sem espaços/acentos      |
+| `palavras`         | `string[]` | Lista de palavras extraídas                   |
+| `grupos_palavras`  | `object[]` | Agrupamento de letras por palavra             |
+| `letras`           | `string[]` | Todas as letras na ordem de soletração        |
+| `sequencia`        | `object[]` | Sequência detalhada para reprodução           |
+| `status_atual`     | `string`   | Estado atual da sessão                        |
+| `proximo_status`   | `string`   | Próximo passo sugerido                        |
 
-Campos principais:
+**💻 Exemplo:**
 
-- `rota`
-- `texto_original`
-- `texto_normalizado`
-- `palavras`
-- `grupos_palavras`
-- `letras`
-- `sequencia`
-- `status_atual`
-- `proximo_status`
-
-### Exemplo de resposta
+```bash
+curl "http://127.0.0.1:8000/soletracao-palavras?texto=oi%20tudo%20bem"
+```
 
 ```json
 {
@@ -305,170 +333,167 @@ Campos principais:
 }
 ```
 
-### Exemplo de uso
+---
 
-```text
-http://127.0.0.1:8000/soletracao-palavras?texto=oi%20tudo%20bem
+#### ▶️ `GET /soletracao-palavras/iniciar`
+
+> Inicia uma sessão de reprodução da soletração no backend. A sessão controla o ritmo e a ordem de exibição das letras.
+
+**📥 Query params:**
+
+| Parâmetro | Tipo     | Obrigatório | Descrição         |
+| --------- | -------- | ----------- | ----------------- |
+| `texto`   | `string` | ✅ sim      | Texto a soletrar  |
+
+**📤 Resposta:**
+
+| Campo              | Tipo       | Descrição                                   |
+| ------------------ | ---------- | ------------------------------------------- |
+| `session_id`       | `string`   | Identificador único da sessão               |
+| `texto_original`   | `string`   | Texto enviado                               |
+| `texto_normalizado`| `string`   | Texto normalizado                           |
+| `palavras`         | `string[]` | Palavras extraídas                          |
+| `grupos_palavras`  | `object[]` | Letras agrupadas por palavra                |
+| `fila`             | `object[]` | Fila de itens a reproduzir                  |
+| `duracao_item_ms`  | `integer`  | Duração de cada item em milissegundos       |
+| `duracao_pausa_ms` | `integer`  | Duração da pausa entre itens (ms)           |
+| `status_atual`     | `string`   | Estado da sessão após inicialização         |
+
+**💻 Exemplo:**
+
+```bash
+curl "http://127.0.0.1:8000/soletracao-palavras/iniciar?texto=oi"
 ```
 
-## ▶️ `GET /soletracao-palavras/iniciar?texto=oi`
+---
 
-### Finalidade
+#### ⏱️ `GET /soletracao-palavras/status`
 
-Inicia uma sessão de reprodução da soletração no backend.
+> Consulta o progresso da sessão de reprodução em andamento.
 
-### Parâmetros
+**📥 Parâmetros:** nenhum
 
-Query param obrigatório:
+**📤 Resposta:**
 
-- `texto`
+| Campo             | Tipo       | Descrição                                    |
+| ----------------- | ---------- | -------------------------------------------- |
+| `status_atual`    | `string`   | Estado atual (`reproduzindo`, `pausado`...)   |
+| `session_id`      | `string`   | ID da sessão ativa                           |
+| `palavras`        | `string[]` | Palavras da sessão                           |
+| `grupos_palavras` | `object[]` | Letras por palavra                           |
+| `fila`            | `object[]` | Fila completa de itens                       |
+| `item_atual`      | `object`   | Item sendo reproduzido no momento            |
+| `indice_atual`    | `integer`  | Índice do item atual na fila                 |
+| `restante_ms_item`| `integer`  | Tempo restante do item atual (ms)            |
+| `finalizado`      | `boolean`  | `true` se toda a fila já foi reproduzida     |
 
-### Resposta esperada
+**💻 Exemplo:**
 
-Campos principais:
-
-- `session_id`
-- `texto_original`
-- `texto_normalizado`
-- `palavras`
-- `grupos_palavras`
-- `fila`
-- `duracao_item_ms`
-- `duracao_pausa_ms`
-- `status_atual`
-
-### Exemplo de uso
-
-```text
-http://127.0.0.1:8000/soletracao-palavras/iniciar?texto=oi
+```bash
+curl http://127.0.0.1:8000/soletracao-palavras/status
 ```
 
-## ⏱️ `GET /soletracao-palavras/status`
+---
 
-### Finalidade
+#### 🖥️ `GET /soletracao-palavras/tela`
 
-Consulta o estado atual da sessão de reprodução da soletração.
+> Entrega a página HTML interativa para testar o fluxo de soletração com GIFs e reconhecimento de voz no navegador.
 
-### Parâmetros
+**📥 Parâmetros:** nenhum
 
-Nenhum.
+**📤 Resposta:** `text/html`
 
-### Resposta esperada
+**💻 Exemplo:**
 
-Campos principais:
-
-- `status_atual`
-- `session_id`
-- `palavras`
-- `grupos_palavras`
-- `fila`
-- `item_atual`
-- `indice_atual`
-- `restante_ms_item`
-- `finalizado`
-
-### Exemplo de uso
-
-```text
-http://127.0.0.1:8000/soletracao-palavras/status
-```
-
-## 🖥️ `GET /soletracao-palavras/tela`
-
-### Finalidade
-
-Entrega a página HTML usada para testar o fluxo de soletração por voz e GIFs.
-
-### Parâmetros
-
-Nenhum.
-
-### Resposta esperada
-
-- conteúdo HTML
-
-### Exemplo de uso
-
-```text
+```bash
+# 🌐 Abrir diretamente no navegador
 http://127.0.0.1:8000/soletracao-palavras/tela
 ```
 
-## 🖼️ `GET /soletracao-palavras/gifs/<arquivo>`
+---
 
-### Finalidade
+#### 🖼️ `GET /soletracao-palavras/gifs/{arquivo}`
 
-Entrega um GIF da base local de letras.
+> Entrega um GIF de letra da base local.
 
-### Parâmetros
+**📥 Parâmetro de rota:**
 
-Na própria rota:
+| Parâmetro | Tipo     | Obrigatório | Descrição                         |
+| --------- | -------- | ----------- | --------------------------------- |
+| `arquivo` | `string` | ✅ sim      | Nome do arquivo (ex: `O.gif`)     |
 
-- nome do arquivo GIF, por exemplo `O.gif`
+**📤 Códigos de resposta:**
 
-### Resposta esperada
+| Status | 🏷️   | Descrição                   |
+| ------ | ----- | --------------------------- |
+| `200`  | ✅    | GIF retornado com sucesso   |
+| `404`  | ❌    | Arquivo não encontrado      |
 
-- conteúdo binário do GIF
-- ou erro `404` se o arquivo não existir
+**💻 Exemplo:**
 
-### Exemplo de uso
-
-```text
-http://127.0.0.1:8000/soletracao-palavras/gifs/O.gif
+```bash
+curl -O http://127.0.0.1:8000/soletracao-palavras/gifs/O.gif
 ```
 
-## 🔊 `GET /soletracao-palavras/audios/<arquivo>`
+---
 
-### Finalidade
+#### 🔊 `GET /soletracao-palavras/audios/{arquivo}`
 
-Entrega um áudio previamente salvo no backend.
+> Entrega um arquivo de áudio previamente salvo no backend.
 
-### Parâmetros
+**📥 Parâmetro de rota:**
 
-Na própria rota:
+| Parâmetro | Tipo     | Obrigatório | Descrição                                             |
+| --------- | -------- | ----------- | ----------------------------------------------------- |
+| `arquivo` | `string` | ✅ sim      | Nome do arquivo (ex: `audio_20260330_150241.webm`)    |
 
-- nome do arquivo de áudio
+**📤 Códigos de resposta:**
 
-### Resposta esperada
+| Status | 🏷️   | Descrição                     |
+| ------ | ----- | ----------------------------- |
+| `200`  | ✅    | Áudio retornado com sucesso   |
+| `404`  | ❌    | Arquivo não encontrado        |
 
-- conteúdo binário do áudio
-- ou erro `404`
+**💻 Exemplo:**
 
-### Exemplo de uso
-
-```text
-http://127.0.0.1:8000/soletracao-palavras/audios/audio_20260330_150241_861975.webm
+```bash
+curl -O http://127.0.0.1:8000/soletracao-palavras/audios/audio_20260330_150241_861975.webm
 ```
 
-## 🎙️ `POST /soletracao-palavras/audio`
+---
 
-### Finalidade
+#### 🎙️ `POST /soletracao-palavras/audio`
 
-Recebe um áudio em base64 enviado pela tela web e salva o arquivo localmente.
+> Recebe um áudio codificado em base64 (enviado pela tela web) e salva o arquivo localmente no backend.
 
-### Corpo esperado
+**📥 Headers:** `Content-Type: application/json`
 
-```json
-{
-  "audio_base64": "data:audio/webm;base64,...",
-  "extensao": "webm"
-}
+**📥 Corpo (JSON):**
+
+| Campo          | Tipo     | Obrigatório | Descrição                                          |
+| -------------- | -------- | ----------- | -------------------------------------------------- |
+| `audio_base64` | `string` | ✅ sim      | Áudio em base64 (ex: `data:audio/webm;base64,...`) |
+| `extensao`     | `string` | ❌ não      | Extensão do arquivo (padrão: `webm`)               |
+
+**📤 Códigos de resposta:**
+
+| Status | 🏷️   | Descrição                             |
+| ------ | ----- | ------------------------------------- |
+| `201`  | ✅    | Áudio salvo com sucesso               |
+| `400`  | ❌    | JSON inválido ou base64 mal formado   |
+
+**💻 Exemplo:**
+
+```bash
+curl -X POST http://127.0.0.1:8000/soletracao-palavras/audio \
+  -H "Content-Type: application/json" \
+  -d '{
+    "audio_base64": "data:audio/webm;base64,GkXfo59ChoEBQv...",
+    "extensao": "webm"
+  }'
 ```
 
-### Parâmetros
-
-No JSON:
-
-- `audio_base64`: obrigatório
-- `extensao`: opcional, padrão `webm`
-
-### Resposta esperada
-
-Status:
-
-- `201` em caso de sucesso
-- `400` em caso de erro de JSON ou base64 inválido
-
-### Exemplo de resposta
+**✅ Resposta (`201`):**
 
 ```json
 {
@@ -481,33 +506,37 @@ Status:
 }
 ```
 
-## 🧠 `POST /soletracao-palavras/transcrever`
+---
 
-### Finalidade
+#### 🧠 `POST /soletracao-palavras/transcrever`
 
-Executa a transcrição provisória do último áudio salvo.
+> Executa a transcrição do último áudio salvo. Atualmente opera em modo provisório (simulado).
 
-### Corpo esperado
+**📥 Headers:** `Content-Type: application/json`
 
-Atualmente a rota aceita um JSON vazio:
+**📥 Corpo (JSON):** pode ser vazio (`{}`)
 
-```json
-{}
+**📤 Resposta:**
+
+| Campo              | Tipo     | Descrição                                         |
+| ------------------ | -------- | ------------------------------------------------- |
+| `rota`             | `string` | Rota chamada                                      |
+| `modo`             | `string` | Modo de transcrição (`provisorio` ou `real`)       |
+| `mensagem`         | `string` | Descrição do resultado                            |
+| `audio`            | `object` | Informações do arquivo de áudio processado        |
+| `texto_transcrito` | `string` | Texto resultante da transcrição                   |
+| `texto_normalizado`| `string` | Texto normalizado (maiúsculas, sem acentos)       |
+| `observacao`       | `string` | Notas adicionais sobre o modo de operação         |
+
+**💻 Exemplo:**
+
+```bash
+curl -X POST http://127.0.0.1:8000/soletracao-palavras/transcrever \
+  -H "Content-Type: application/json" \
+  -d '{}'
 ```
 
-### Resposta esperada
-
-Campos principais:
-
-- `rota`
-- `modo`
-- `mensagem`
-- `audio`
-- `texto_transcrito`
-- `texto_normalizado`
-- `observacao`
-
-### Exemplo de resposta
+**✅ Resposta:**
 
 ```json
 {
@@ -519,51 +548,122 @@ Campos principais:
 }
 ```
 
-## 🧪 Fluxos de teste recomendados
+---
 
-### Fluxo 1: teste rápido da API
+## 📊 Códigos de Status HTTP
 
-1. Suba a API:
+Resumo dos códigos utilizados pela API:
 
-```powershell
+| Status | 🏷️ Ícone | Significado                                           |
+| ------ | --------- | ----------------------------------------------------- |
+| `200`  | ✅        | Requisição bem-sucedida                               |
+| `201`  | 🆕        | Recurso criado com sucesso (ex: áudio salvo)          |
+| `400`  | ❌        | Requisição inválida (parâmetro ausente, JSON ruim)    |
+| `404`  | 🔍        | Recurso não encontrado (arquivo, rota)                |
+| `408`  | ⏱️        | Timeout no reconhecimento de letra                    |
+
+---
+
+## 🧪 Fluxos de Teste Recomendados
+
+### 🚀 Fluxo 1 — Verificação rápida
+
+> 🎯 **Objetivo:** confirmar que a API está rodando.
+
+```bash
+# 1️⃣ Subir a API
 python api_server.py
+
+# 2️⃣ Verificar resposta da raiz
+curl http://127.0.0.1:8000/
 ```
 
-2. Acesse:
+---
 
-```text
-http://127.0.0.1:8000/
-```
+### 🖥️ Fluxo 2 — Tela web interativa
 
-### Fluxo 2: teste da tela web
+> 🎯 **Objetivo:** testar soletração com GIFs e voz pelo navegador.
 
-1. Suba a API:
-
-```powershell
+```bash
+# 1️⃣ Subir a API
 python api_server.py
+
+# 2️⃣ Abrir a tela no navegador
+# 🌐 http://127.0.0.1:8000/soletracao-palavras/tela
+
+# 3️⃣ Digitar uma palavra ou usar os botões de voz
 ```
 
-2. Abra:
+---
 
-```text
-http://127.0.0.1:8000/soletracao-palavras/tela
+### 📝 Fluxo 3 — Soletração via API
+
+> 🎯 **Objetivo:** testar a decomposição de texto em letras diretamente pela API.
+
+```bash
+# 1️⃣ Consultar a estrutura de soletração
+curl "http://127.0.0.1:8000/soletracao-palavras?texto=oi%20tudo%20bem"
+
+# 2️⃣ Iniciar uma sessão de reprodução
+curl "http://127.0.0.1:8000/soletracao-palavras/iniciar?texto=oi%20tudo%20bem"
+
+# 3️⃣ Consultar o progresso
+curl http://127.0.0.1:8000/soletracao-palavras/status
 ```
 
-3. Digite uma palavra ou use os botões de voz.
+---
 
-### Fluxo 3: teste direto de soletração
+### 🎙️ Fluxo 4 — Ciclo completo de áudio
 
-Exemplo:
+> 🎯 **Objetivo:** enviar áudio, transcrever e soletrar.
 
-```text
-http://127.0.0.1:8000/soletracao-palavras?texto=oi%20tudo%20bem
+```bash
+# 1️⃣ Enviar áudio em base64
+curl -X POST http://127.0.0.1:8000/soletracao-palavras/audio \
+  -H "Content-Type: application/json" \
+  -d '{"audio_base64": "data:audio/webm;base64,...", "extensao": "webm"}'
+
+# 2️⃣ Transcrever o áudio salvo
+curl -X POST http://127.0.0.1:8000/soletracao-palavras/transcrever \
+  -H "Content-Type: application/json" \
+  -d '{}'
+
+# 3️⃣ Soletrar o texto transcrito
+curl "http://127.0.0.1:8000/soletracao-palavras?texto=oi"
 ```
 
-## ⚠️ Observações técnicas
+---
 
-- O servidor usa `ThreadingHTTPServer`.
-- O fluxo de câmera e hand tracking reaproveita [hand_tracking_service.py](/c:/Users/Natanael/OneDrive/Desktop/hand-tracking-project/hand_tracking_service.py).
-- A transcrição do backend ainda é provisória.
-- O fluxo mais completo de voz hoje usa a tela web e reconhecimento no navegador.
+## 📋 Referência Rápida de Rotas
 
-[⬅️ Voltar para o README principal](/c:/Users/Natanael/OneDrive/Desktop/hand-tracking-project/README.md)
+| 🔵 Método | 🛣️ Rota                                  | 📋 Descrição                        |
+| --------- | ----------------------------------------- | ------------------------------------ |
+| `GET`     | `/`                                       | 🏠 Status da API                    |
+| `GET`     | `/alfabeto`                               | 🔤 Estado do modo alfabeto          |
+| `GET`     | `/estado`                                 | 📊 Estado atual do hand tracking    |
+| `GET`     | `/camera/iniciar`                         | 📷 Iniciar webcam                   |
+| `GET`     | `/camera/parar`                           | 🛑 Parar webcam                     |
+| `GET`     | `/camera/stream`                          | 🎥 Stream MJPEG da câmera           |
+| `GET`     | `/teste/a`                                | 🧪 Teste da letra A                 |
+| `GET`     | `/teste/letra/{letra}`                    | 🔤 Teste de letra específica        |
+| `GET`     | `/soletracao-palavras?texto=...`          | 📝 Estrutura de soletração          |
+| `GET`     | `/soletracao-palavras/iniciar?texto=...`  | ▶️ Iniciar sessão de soletração     |
+| `GET`     | `/soletracao-palavras/status`             | ⏱️ Status da sessão                 |
+| `GET`     | `/soletracao-palavras/tela`               | 🖥️ Tela HTML interativa             |
+| `GET`     | `/soletracao-palavras/gifs/{arquivo}`     | 🖼️ Servir GIF de letra              |
+| `GET`     | `/soletracao-palavras/audios/{arquivo}`   | 🔊 Servir arquivo de áudio          |
+| `POST`    | `/soletracao-palavras/audio`              | 🎙️ Enviar áudio em base64           |
+| `POST`    | `/soletracao-palavras/transcrever`        | 🧠 Transcrever último áudio         |
+
+---
+
+## ⚠️ Observações Técnicas
+
+- ⚙️ O servidor utiliza `ThreadingHTTPServer` da stdlib do Python, permitindo múltiplas conexões simultâneas.
+- 🔗 O fluxo de câmera e hand tracking reutiliza o módulo [`hand_tracking_service.py`](https://github.com/Natanael-Heinrick/libras-hand-tracking/blob/main/hand_tracking_service.py).
+- 🚧 A transcrição de áudio no backend ainda opera em **modo provisório** (simulado). O fluxo mais completo de voz utiliza a tela web com reconhecimento de fala via browser (`Web Speech API`).
+- 📁 Os GIFs de letras devem estar na pasta local configurada no servidor para que a rota `/soletracao-palavras/gifs/` funcione corretamente.
+
+---
+
+[⬅️ Voltar para o README principal](https://github.com/Natanael-Heinrick/libras-hand-tracking/blob/main/README.md)
