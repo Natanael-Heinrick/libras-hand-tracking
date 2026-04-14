@@ -1,0 +1,51 @@
+[
+  {
+    "id": "rato_base",
+    "name": "Rato Base",
+    "price": 45,
+    "file": "rato_base.png",
+    "description": "Look desbloqueavel da loja."
+  },
+  {
+    "id": "rato_base_lingua",
+    "name": "Rato Base Lingua",
+    "price": 80,
+    "file": "rato_base_lingua.png",
+    "description": "Look desbloqueavel da loja."
+  },
+  {
+    "id": "rato_base_lingua_loiro",
+    "name": "Rato Base Lingua Loiro",
+    "price": 110,
+    "file": "rato_base_lingua_loiro.png",
+    "description": "Look desbloqueavel da loja."
+  },
+  {
+    "id": "rato_laranja",
+    "name": "Rato Laranja",
+    "price": 60,
+    "file": "rato_laranja.png",
+    "description": "Look desbloqueavel da loja."
+  },
+  {
+    "id": "rato_laranja_lingua_loiro",
+    "name": "Rato Laranja Lingua Loiro",
+    "price": 125,
+    "file": "rato_laranja_lingua_loiro.png",
+    "description": "Look desbloqueavel da loja."
+  },
+  {
+    "id": "rato_laranja_loiro",
+    "name": "Rato Laranja Loiro",
+    "price": 90,
+    "file": "rato_laranja_loiro.png",
+    "description": "Look desbloqueavel da loja."
+  },
+  {
+    "id": "rato_loiro",
+    "name": "Rato Loiro",
+    "price": 50,
+    "file": "rato_loiro.png",
+    "description": "Look desbloqueavel da loja."
+  }
+]
