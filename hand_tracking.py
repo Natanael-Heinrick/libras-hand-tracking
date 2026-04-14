@@ -5,10 +5,26 @@ import subprocess
 import threading
 
 import cv2
+import numpy as np
 from websockets.asyncio.client import connect
 
 
 SERVER_URL = "ws://127.0.0.1:8765/alfabeto"
+
+
+def draw_text_block(image, lines, start_x, start_y, line_height=28, scale=0.62, color=(255, 255, 255), thickness=2):
+    y = start_y
+    for line in lines:
+        cv2.putText(
+            image,
+            str(line),
+            (start_x, y),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            scale,
+            color,
+            thickness,
+        )
+        y += line_height
 
 
 def encode_frame(frame, quality=70):
@@ -61,45 +77,63 @@ async def main():
 
                 estado = response.get("estado", {})
                 letra = estado.get("letra_estavel") or estado.get("letra") or ""
+                deteccao = (estado.get("deteccoes") or [{}])[0]
+                dedos = deteccao.get("dedos", [])
+                metricas_debug = deteccao.get("metricas_debug", {})
 
-                cv2.putText(
-                    frame,
-                    f"Rota: /alfabeto",
-                    (30, 35),
-                    cv2.FONT_HERSHEY_SIMPLEX,
-                    0.8,
-                    (255, 255, 255),
-                    2,
-                )
-                cv2.putText(
-                    frame,
-                    f"Letra: {letra}",
-                    (30, 75),
-                    cv2.FONT_HERSHEY_SIMPLEX,
-                    1.2,
-                    (0, 255, 0),
-                    3,
-                )
-                cv2.putText(
-                    frame,
-                    f"Palavra: {estado.get('palavra', '')}",
-                    (30, 120),
-                    cv2.FONT_HERSHEY_SIMPLEX,
-                    1.0,
-                    (255, 0, 0),
-                    2,
-                )
-                cv2.putText(
-                    frame,
-                    "ESPACO confirma | C limpa | P fala",
-                    (30, 160),
-                    cv2.FONT_HERSHEY_SIMPLEX,
-                    0.6,
-                    (255, 255, 255),
-                    2,
+                frame = cv2.resize(frame, (960, 720))
+                painel = np.full((720, 520, 3), (22, 28, 40), dtype=np.uint8)
+                canvas = np.hstack((frame, painel))
+
+                draw_text_block(
+                    canvas,
+                    [
+                        "Rota: /alfabeto",
+                        f"Letra atual: {estado.get('letra', '')}",
+                        f"Letra estavel: {letra}",
+                        f"Palavra: {estado.get('palavra', '')}",
+                        f"Maos detectadas: {estado.get('maos_detectadas', 0)}",
+                        f"Dedos: {dedos}",
+                        "",
+                        "Metricas C/P/Q",
+                    ],
+                    990,
+                    40,
+                    line_height=34,
+                    scale=0.72,
                 )
 
-                cv2.imshow("Hand Tracking - Alfabeto", frame)
+                metric_lines = [
+                    f"{chave}: {valor}"
+                    for chave, valor in metricas_debug.items()
+                ]
+                draw_text_block(
+                    canvas,
+                    metric_lines[:10],
+                    990,
+                    315,
+                    line_height=28,
+                    scale=0.6,
+                    color=(200, 255, 200),
+                )
+                draw_text_block(
+                    canvas,
+                    [
+                        "",
+                        "Controles",
+                        "ESPACO confirma",
+                        "C limpa",
+                        "P fala",
+                        "ESC sai",
+                    ],
+                    990,
+                    620,
+                    line_height=26,
+                    scale=0.58,
+                    color=(255, 220, 180),
+                )
+
+                cv2.imshow("Hand Tracking - Alfabeto", canvas)
                 key = cv2.waitKey(1) & 0xFF
 
                 if key == ord(" "):

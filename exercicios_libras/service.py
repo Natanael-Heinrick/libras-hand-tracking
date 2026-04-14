@@ -20,6 +20,7 @@ class ExerciseGameService:
 
     def __init__(self, csv_path: Path | None = None):
         self.csv_path = csv_path or Path(__file__).resolve().parent / "dados" / "palavras_libras_filtrado.csv"
+        self.image_csv_path = Path(__file__).resolve().parent / "dados" / "desafios_imagem.csv"
         self.images_path = Path(__file__).resolve().parent / "imagens_desafios"
         self.words = self._load_words()
         self.image_challenges = self._load_image_challenges()
@@ -104,6 +105,7 @@ class ExerciseGameService:
             "tipo_desafio": self.challenge_type,
             "palavra_alvo": self.target_word,
             "descricao_desafio": self.challenge_prompt,
+            "dica": self.challenge_hint,
             "imagem_nome": self.challenge_image_name,
             "imagem_caminho": image_relative_path,
             "dificuldade": self.difficulty,
@@ -157,6 +159,7 @@ class ExerciseGameService:
         self.challenge_image_name = selected.get("imagem_nome", "")
         self.challenge_image_path = selected.get("imagem_caminho")
         self.challenge_prompt = selected.get("descricao", "Monte a palavra alvo usando os gestos e confirme as letras.")
+        self.challenge_hint = selected.get("dica", "")
         self.points_per_word = POINTS_BY_DIFFICULTY.get(self.difficulty, 1)
 
     def _advance_word(self):
@@ -181,6 +184,7 @@ class ExerciseGameService:
             "imagem_nome": "",
             "imagem_caminho": None,
             "descricao": "Monte a palavra alvo usando os gestos e confirme as letras.",
+            "dica": "",
         }
 
     def _load_words(self) -> list[dict]:
@@ -207,6 +211,7 @@ class ExerciseGameService:
                         "imagem_nome": "",
                         "imagem_caminho": None,
                         "descricao": "Monte a palavra alvo usando os gestos e confirme as letras.",
+                        "dica": "",
                     }
                 )
 
@@ -216,6 +221,7 @@ class ExerciseGameService:
         if not self.images_path.exists():
             return []
 
+        metadata_by_image = self._load_image_metadata()
         challenges = []
         for image_path in sorted(self.images_path.iterdir()):
             if not image_path.is_file():
@@ -224,7 +230,10 @@ class ExerciseGameService:
             if image_path.suffix.lower() not in {".png", ".jpg", ".jpeg", ".bmp", ".webp"}:
                 continue
 
-            answer = "".join(char for char in image_path.stem.upper() if char.isalpha())
+            image_metadata = metadata_by_image.get(image_path.name.lower(), {})
+            answer = "".join(
+                char for char in (image_metadata.get("resposta") or image_path.stem).upper() if char.isalpha()
+            )
             if not answer:
                 continue
 
@@ -232,12 +241,37 @@ class ExerciseGameService:
                 {
                     "tipo": "imagem",
                     "palavra": answer,
-                    "nivel": "facil",
+                    "nivel": image_metadata.get("dificuldade", "facil"),
                     "tamanho": len(answer),
                     "imagem_nome": image_path.name,
                     "imagem_caminho": image_path,
                     "descricao": "Observe a imagem e soletre exatamente o nome dela.",
+                    "dica": image_metadata.get("dica", ""),
                 }
             )
 
         return challenges
+
+    def _load_image_metadata(self) -> dict[str, dict]:
+        if not self.image_csv_path.exists():
+            return {}
+
+        metadata = {}
+        with self.image_csv_path.open("r", encoding="utf-8", newline="") as csv_file:
+            reader = csv.DictReader(csv_file)
+            for row in reader:
+                image_name = (row.get("imagem") or "").strip()
+                if not image_name:
+                    continue
+
+                difficulty = (row.get("dificuldade") or "facil").strip().lower()
+                if difficulty not in DIFFICULTIES:
+                    difficulty = "facil"
+
+                metadata[image_name.lower()] = {
+                    "resposta": (row.get("resposta") or "").strip(),
+                    "dificuldade": difficulty,
+                    "dica": (row.get("dica") or "").strip(),
+                }
+
+        return metadata
