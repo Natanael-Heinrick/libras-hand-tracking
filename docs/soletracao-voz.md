@@ -1,8 +1,9 @@
 # 🎤 Soletracao por Voz
 
-[⬅️ Voltar para o README principal](/c:/Users/Natanael/OneDrive/Desktop/hand-tracking-project/README.md)
+[⬅️ Voltar para o README principal](../README.md)
 
 Este documento descreve o fluxo HTTP de soletração por voz, texto e GIFs.
+//
 
 ## 📌 Visão Geral
 
@@ -17,15 +18,15 @@ Esse fluxo usa uma API HTTP local e uma interface web simples.
 
 ## 🧱 Arquivos principais
 
-- [api_server.py](/c:/Users/Natanael/OneDrive/Desktop/hand-tracking-project/api_server.py)
+- [api_server.py](../api_server.py)
   Servidor HTTP local.
-- [soletracao_palavras/service.py](/c:/Users/Natanael/OneDrive/Desktop/hand-tracking-project/soletracao_palavras/service.py)
+- [soletracao_palavras/service.py](../soletracao_palavras/service.py)
   Lógica da soletração e controle de reprodução.
-- [soletracao_palavras/audio_service.py](/c:/Users/Natanael/OneDrive/Desktop/hand-tracking-project/soletracao_palavras/audio_service.py)
+- [soletracao_palavras/audio_service.py](../soletracao_palavras/audio_service.py)
   Serviço responsável por salvar os áudios enviados.
-- [soletracao_palavras/transcription_service.py](/c:/Users/Natanael/OneDrive/Desktop/hand-tracking-project/soletracao_palavras/transcription_service.py)
+- [soletracao_palavras/transcription_service.py](../soletracao_palavras/transcription_service.py)
   Serviço de transcrição provisória do backend.
-- [soletracao_palavras/tela.html](/c:/Users/Natanael/OneDrive/Desktop/hand-tracking-project/soletracao_palavras/tela.html)
+- [soletracao_palavras/tela.html](../soletracao_palavras/tela.html)
   Tela web de teste.
 
 ## ▶️ Como executar
@@ -56,7 +57,7 @@ Interface principal:
 
 Arquivo da interface:
 
-- [soletracao_palavras/tela.html](/c:/Users/Natanael/OneDrive/Desktop/hand-tracking-project/soletracao_palavras/tela.html)
+- [soletracao_palavras/tela.html](../soletracao_palavras/tela.html)
 
 ## 🧩 Componentes do fluxo
 
@@ -72,7 +73,7 @@ Responsável por:
 
 Arquivo:
 
-- [soletracao_palavras/service.py](/c:/Users/Natanael/OneDrive/Desktop/hand-tracking-project/soletracao_palavras/service.py)
+- [soletracao_palavras/service.py](../soletracao_palavras/service.py)
 
 ### 2. Controle de reprodução
 
@@ -85,7 +86,7 @@ Responsável por:
 
 Também implementado em:
 
-- [soletracao_palavras/service.py](/c:/Users/Natanael/OneDrive/Desktop/hand-tracking-project/soletracao_palavras/service.py)
+- [soletracao_palavras/service.py](../soletracao_palavras/service.py)
 
 ### 3. Captura e persistência de áudio
 
@@ -97,7 +98,7 @@ Responsável por:
 
 Arquivo:
 
-- [soletracao_palavras/audio_service.py](/c:/Users/Natanael/OneDrive/Desktop/hand-tracking-project/soletracao_palavras/audio_service.py)
+- [soletracao_palavras/audio_service.py](../soletracao_palavras/audio_service.py)
 
 ### 4. Transcrição
 
@@ -118,7 +119,7 @@ Existe uma rota HTTP que responde com texto fixo de teste para validar a arquite
 
 Arquivo:
 
-- [soletracao_palavras/transcription_service.py](/c:/Users/Natanael/OneDrive/Desktop/hand-tracking-project/soletracao_palavras/transcription_service.py)
+- [soletracao_palavras/transcription_service.py](../soletracao_palavras/transcription_service.py)
 
 ## 🗂️ Recursos locais usados
 
@@ -126,7 +127,7 @@ Arquivo:
 
 Pasta:
 
-- [soletracao_palavras/gifs](/c:/Users/Natanael/OneDrive/Desktop/hand-tracking-project/soletracao_palavras/gifs)
+- [soletracao_palavras/gifs](../soletracao_palavras/gifs)
 
 Uso:
 
@@ -137,7 +138,7 @@ Uso:
 
 Pasta:
 
-- [soletracao_palavras/audios](/c:/Users/Natanael/OneDrive/Desktop/hand-tracking-project/soletracao_palavras/audios)
+- [soletracao_palavras/audios](../soletracao_palavras/audios)
 
 Uso:
 
@@ -206,7 +207,7 @@ Também existem:
 
 ## 🎛️ Controles da tela web
 
-Na interface [soletracao_palavras/tela.html](/c:/Users/Natanael/OneDrive/Desktop/hand-tracking-project/soletracao_palavras/tela.html), o usuário pode:
+Na interface [soletracao_palavras/tela.html](../soletracao_palavras/tela.html), o usuário pode:
 
 - digitar texto e clicar em `Mostrar`
 - gravar áudio
@@ -267,7 +268,7 @@ oi tudo bem
 4. clique em `Enviar audio`
 5. confirme se o arquivo foi salvo em:
 
-- [soletracao_palavras/audios](/c:/Users/Natanael/OneDrive/Desktop/hand-tracking-project/soletracao_palavras/audios)
+- [soletracao_palavras/audios](../soletracao_palavras/audios)
 
 ### Fluxo 4: teste da transcrição provisória
 
@@ -283,4 +284,4 @@ oi tudo bem
 - se um GIF não existir, ele não entra na fila de reprodução
 - a tela já organiza frases em blocos por palavra, não apenas em letras soltas
 
-[⬅️ Voltar para o README principal](/c:/Users/Natanael/OneDrive/Desktop/hand-tracking-project/README.md)
+[⬅️ Voltar para o README principal](../README.md)
