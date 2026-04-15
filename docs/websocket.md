@@ -1,6 +1,6 @@
 # 🔌 WebSocket
 
-[⬅️ Voltar para o README principal](/c:/Users/Natanael/OneDrive/Desktop/hand-tracking-project/README.md)
+[⬅️ Voltar para o README principal](../README.md)
 
 Este documento descreve o fluxo WebSocket do projeto, incluindo:
 
@@ -15,7 +15,7 @@ Este documento descreve o fluxo WebSocket do projeto, incluindo:
 
 Arquivo principal do servidor:
 
-- [websocket_server.py](/c:/Users/Natanael/OneDrive/Desktop/hand-tracking-project/websocket_server.py)
+- [websocket_server.py](../websocket_server.py)
 
 Endereço base:
 
@@ -50,7 +50,7 @@ Rota usada para:
 
 Cliente relacionado:
 
-- [websocket_client.py](/c:/Users/Natanael/OneDrive/Desktop/hand-tracking-project/websocket_client.py)
+- [websocket_client.py](../websocket_client.py)
 
 ### `ws://127.0.0.1:8765/exercicios`
 
@@ -63,28 +63,28 @@ Rota usada para:
 
 Cliente relacionado:
 
-- [websocket_exercicios_client.py](/c:/Users/Natanael/OneDrive/Desktop/hand-tracking-project/websocket_exercicios_client.py)
+- [websocket_exercicios_client.py](../websocket_exercicios_client.py)
 
 ## 🧱 Componentes Envolvidos
 
 ### Servidor
 
-- [websocket_server.py](/c:/Users/Natanael/OneDrive/Desktop/hand-tracking-project/websocket_server.py)
+- [websocket_server.py](../websocket_server.py)
 
 ### Processamento de mão
 
-- [hand_tracking_service.py](/c:/Users/Natanael/OneDrive/Desktop/hand-tracking-project/hand_tracking_service.py)
-- [letter_classifier.py](/c:/Users/Natanael/OneDrive/Desktop/hand-tracking-project/letter_classifier.py)
-- [hand_geometry.py](/c:/Users/Natanael/OneDrive/Desktop/hand-tracking-project/hand_geometry.py)
+- [hand_tracking_service.py](../hand_tracking_service.py)
+- [letter_classifier.py](../letter_classifier.py)
+- [hand_geometry.py](../hand_geometry.py)
 
 ### Clientes
 
-- [websocket_client.py](/c:/Users/Natanael/OneDrive/Desktop/hand-tracking-project/websocket_client.py)
-- [websocket_exercicios_client.py](/c:/Users/Natanael/OneDrive/Desktop/hand-tracking-project/websocket_exercicios_client.py)
+- [websocket_client.py](../websocket_client.py)
+- [websocket_exercicios_client.py](../websocket_exercicios_client.py)
 
 ### Modo exercícios
 
-- [exercicios_libras/service.py](/c:/Users/Natanael/OneDrive/Desktop/hand-tracking-project/exercicios_libras/service.py)
+- [exercicios_libras/service.py](../exercicios_libras/service.py)
 
 ## 📨 Formato Geral das Mensagens
 
@@ -329,7 +329,7 @@ Campos principais:
 
 Arquivo:
 
-- [websocket_client.py](/c:/Users/Natanael/OneDrive/Desktop/hand-tracking-project/websocket_client.py)
+- [websocket_client.py](../websocket_client.py)
 
 Como executar:
 
@@ -347,7 +347,7 @@ Controles:
 
 Arquivo:
 
-- [websocket_exercicios_client.py](/c:/Users/Natanael/OneDrive/Desktop/hand-tracking-project/websocket_exercicios_client.py)
+- [websocket_exercicios_client.py](../websocket_exercicios_client.py)
 
 Como executar:
 
@@ -418,4 +418,4 @@ python websocket_exercicios_client.py
 - A rota `/exercicios` reutiliza a base de hand tracking e adiciona o estado do jogo.
 - Rotas WebSocket inválidas devolvem uma mensagem de erro e fecham a conexão.
 
-[⬅️ Voltar para o README principal](/c:/Users/Natanael/OneDrive/Desktop/hand-tracking-project/README.md)
+[⬅️ Voltar para o README principal](../README.md)
