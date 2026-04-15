@@ -418,4 +418,4 @@ python websocket_exercicios_client.py
 - A rota `/exercicios` reutiliza a base de hand tracking e adiciona o estado do jogo.
 - Rotas WebSocket inválidas devolvem uma mensagem de erro e fecham a conexão.
 
-[⬅️ Voltar para o README principal](../README.md)
+[⬅️ Voltar para o README principal](../README.md)//

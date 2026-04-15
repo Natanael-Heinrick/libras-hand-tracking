@@ -3,6 +3,7 @@
 [⬅️ Voltar para o README principal](../README.md)
 
 Este documento descreve o fluxo HTTP de soletração por voz, texto e GIFs.
+//
 
 ## 📌 Visão Geral
 

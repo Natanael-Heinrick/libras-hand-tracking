@@ -212,4 +212,4 @@ Verifique se:
 - Atualmente a instalação é feita manualmente via `pip install`
 - Como melhoria futura, vale gerar um `requirements.txt` para padronizar o ambiente
 
-[⬅️ Voltar para o README principal](../README.md)
+[⬅️ Voltar para o README principal](../README.md)//
