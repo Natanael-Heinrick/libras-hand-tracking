@@ -3,17 +3,34 @@ import base64
 import json
 
 import cv2
+import numpy as np
 from websockets.asyncio.client import connect
 
 
 SERVER_URL = "ws://127.0.0.1:8765/duelo"
 WINDOW_NAME = "Duelo de Tempo LIBRAS"
+FRAME_WIDTH = 1280
+FRAME_HEIGHT = 720
+CAMERA_WIDTH = 760
+PANEL_X = 790
+PANEL_WIDTH = 460
+COLOR_BG = (20, 26, 38)
+COLOR_PANEL = (28, 37, 54)
+COLOR_BORDER = (105, 160, 235)
+COLOR_TEXT = (245, 248, 255)
+COLOR_MUTED = (184, 198, 220)
+COLOR_ACCENT = (96, 224, 255)
+COLOR_SUCCESS = (145, 235, 165)
+COLOR_WARNING = (130, 190, 255)
+COLOR_DANGER = (160, 180, 255)
+PLAYER_ONE_COLOR = (255, 120, 0)
+PLAYER_TWO_COLOR = (0, 140, 255)
 
 
-def draw_text(canvas, text, position, scale=0.8, color=(255, 255, 255), thickness=2):
+def draw_text(canvas, text, position, scale=0.8, color=COLOR_TEXT, thickness=2):
     cv2.putText(
         canvas,
-        text,
+        str(text),
         position,
         cv2.FONT_HERSHEY_SIMPLEX,
         scale,
@@ -21,6 +38,43 @@ def draw_text(canvas, text, position, scale=0.8, color=(255, 255, 255), thicknes
         thickness,
         cv2.LINE_AA,
     )
+
+
+def draw_card(canvas, top_left, bottom_right, title, border_color=COLOR_BORDER):
+    x1, y1 = top_left
+    x2, y2 = bottom_right
+    cv2.rectangle(canvas, (x1, y1), (x2, y2), COLOR_PANEL, -1)
+    cv2.rectangle(canvas, (x1, y1), (x2, y2), border_color, 2)
+    draw_text(canvas, title, (x1 + 18, y1 + 32), scale=0.68, color=(230, 236, 255), thickness=2)
+
+
+def draw_lives(canvas, label, current, max_lives, start_x, y, color):
+    draw_text(canvas, label, (start_x, y), scale=0.62, color=color, thickness=2)
+    x = start_x
+    for index in range(max_lives):
+        filled = index < current
+        fill_color = color if filled else (80, 90, 110)
+        cv2.circle(canvas, (x + 18, y + 34), 10, fill_color, -1)
+        cv2.circle(canvas, (x + 18, y + 34), 10, (235, 240, 248), 1)
+        x += 30
+
+
+def wrap_text(text, max_chars=34):
+    words = (text or "").split()
+    if not words:
+        return []
+
+    lines = []
+    current = words[0]
+    for word in words[1:]:
+        candidate = f"{current} {word}"
+        if len(candidate) <= max_chars:
+            current = candidate
+        else:
+            lines.append(current)
+            current = word
+    lines.append(current)
+    return lines
 
 
 def encode_frame(frame, quality=70):
@@ -37,32 +91,135 @@ def fmt_time(value):
     return f"{value:.2f}s"
 
 
-def draw_panel(frame, duelo, estado):
+def get_phase_label(phase):
+    labels = {
+        "aguardando_inicio": "Aguardando inicio",
+        "jogando": "Rodada em andamento",
+        "troca_jogador": "Troca de jogador",
+        "resultado": "Resultado da rodada",
+    }
+    return labels.get(phase, phase or "")
+
+
+def create_layout(frame):
+    resized = cv2.resize(frame, (CAMERA_WIDTH, FRAME_HEIGHT))
+    canvas = np.full((FRAME_HEIGHT, FRAME_WIDTH, 3), COLOR_BG, dtype=np.uint8)
+    canvas[:, :CAMERA_WIDTH] = resized
+
+    # Gradient overlay over the camera view for readability.
+    overlay = canvas.copy()
+    cv2.rectangle(overlay, (0, 0), (CAMERA_WIDTH, 120), (12, 18, 30), -1)
+    cv2.rectangle(overlay, (0, FRAME_HEIGHT - 140), (CAMERA_WIDTH, FRAME_HEIGHT), (12, 18, 30), -1)
+    cv2.addWeighted(overlay, 0.25, canvas, 0.75, 0, canvas)
+
+    cv2.rectangle(canvas, (CAMERA_WIDTH, 0), (FRAME_WIDTH, FRAME_HEIGHT), (16, 22, 34), -1)
+    cv2.rectangle(canvas, (CAMERA_WIDTH + 6, 14), (FRAME_WIDTH - 14, FRAME_HEIGHT - 14), (40, 56, 84), 2)
+    return canvas
+
+
+def draw_header(canvas, duelo, estado):
     player_color = tuple(duelo.get("jogador_atual_cor_bgr", [255, 255, 255]))
-    draw_text(frame, "Rota: /duelo", (30, 35), scale=0.8)
-    draw_text(frame, "Duelo de Tempo LIBRAS", (30, 75), scale=1.0, thickness=3)
-    draw_text(frame, f"Palavra alvo: {duelo.get('palavra_alvo', '')}", (30, 120), scale=0.9, color=(0, 220, 255), thickness=2)
-    draw_text(frame, f"Sua palavra: {estado.get('palavra', '')}", (30, 160), scale=0.9, color=(255, 255, 0), thickness=2)
-    draw_text(frame, f"Letra atual: {estado.get('letra_estavel') or estado.get('letra') or ''}", (30, 200), scale=0.82, color=(180, 255, 180))
-    draw_text(frame, f"Jogador atual: {duelo.get('jogador_atual_label', '')}", (30, 245), scale=0.95, color=player_color, thickness=3)
-    draw_text(frame, f"Fase: {duelo.get('fase', '')}", (30, 285), scale=0.75, color=(210, 210, 210))
-    draw_text(frame, f"Tempo atual: {fmt_time(duelo.get('tempo_atual'))}", (30, 325), scale=0.8)
-    draw_text(frame, f"Tempo Oponente 1: {fmt_time(duelo.get('tempo_oponente_1'))}", (30, 365), scale=0.8, color=(255, 120, 0))
-    draw_text(frame, f"Tempo Oponente 2: {fmt_time(duelo.get('tempo_oponente_2'))}", (30, 405), scale=0.8, color=(0, 140, 255))
-    draw_text(frame, f"Tempo a bater: {fmt_time(duelo.get('tempo_a_bater'))}", (30, 445), scale=0.8, color=(140, 220, 255))
-    draw_text(
-        frame,
-        f"Vidas: O1 {duelo.get('vidas_oponente_1', 0)}/{duelo.get('vidas_maximas', 0)} | O2 {duelo.get('vidas_oponente_2', 0)}/{duelo.get('vidas_maximas', 0)}",
-        (30, 485),
-        scale=0.76,
-    )
-    draw_text(frame, f"CSV: {duelo.get('fonte_dados', '')}", (30, 525), scale=0.58, color=(190, 230, 255))
-    draw_text(frame, f"Palavras validas: {duelo.get('total_palavras_validas', 0)}", (30, 555), scale=0.7, color=(190, 230, 255))
-    draw_text(frame, f"Feedback: {duelo.get('feedback', '')}", (30, 595), scale=0.67, color=(200, 255, 200))
-    draw_text(frame, f"Troca: {duelo.get('mensagem_transicao', '')}", (30, 630), scale=0.62, color=(255, 220, 180))
-    draw_text(frame, f"Resultado: {duelo.get('motivo_vitoria', '')}", (30, 655), scale=0.62, color=(255, 200, 200))
-    draw_text(frame, "S inicia | ESPACO confirma letra | ENTER valida | C limpa", (30, 685), scale=0.56)
-    draw_text(frame, "T troca jogador | N proxima palavra | R reinicia duelo | ESC sai", (30, 710), scale=0.56)
+    draw_text(canvas, "Duelo de Tempo LIBRAS", (28, 54), scale=1.0, thickness=3)
+    draw_text(canvas, f"Palavra alvo: {duelo.get('palavra_alvo', '')}", (28, 95), scale=0.82, color=COLOR_ACCENT)
+    draw_text(canvas, f"Sua palavra: {estado.get('palavra', '') or '_'}", (28, 132), scale=0.88, color=(255, 240, 120), thickness=2)
+    draw_text(canvas, f"Jogador atual: {duelo.get('jogador_atual_label', '')}", (28, 170), scale=0.78, color=player_color, thickness=3)
+
+
+def draw_right_panel(canvas, duelo, estado):
+    phase = duelo.get("fase", "")
+    player_color = tuple(duelo.get("jogador_atual_cor_bgr", [255, 255, 255]))
+
+    draw_card(canvas, (PANEL_X, 26), (1248, 116), "STATUS DA RODADA", border_color=player_color)
+    draw_text(canvas, get_phase_label(phase), (PANEL_X + 18, 72), scale=0.85, color=player_color, thickness=3)
+    draw_text(canvas, f"Letra atual: {estado.get('letra_estavel') or estado.get('letra') or '--'}", (PANEL_X + 18, 103), scale=0.68, color=COLOR_SUCCESS)
+
+    draw_card(canvas, (PANEL_X, 136), (1248, 280), "PLACAR")
+    draw_text(canvas, "Oponente 1", (PANEL_X + 18, 177), scale=0.72, color=PLAYER_ONE_COLOR, thickness=3)
+    draw_text(canvas, fmt_time(duelo.get("tempo_oponente_1")), (PANEL_X + 270, 178), scale=0.9, color=PLAYER_ONE_COLOR, thickness=3)
+    draw_lives(canvas, "Vidas", duelo.get("vidas_oponente_1", 0), duelo.get("vidas_maximas", 0), PANEL_X + 18, 190, PLAYER_ONE_COLOR)
+
+    draw_text(canvas, "Oponente 2", (PANEL_X + 18, 238), scale=0.72, color=PLAYER_TWO_COLOR, thickness=3)
+    draw_text(canvas, fmt_time(duelo.get("tempo_oponente_2")), (PANEL_X + 270, 239), scale=0.9, color=PLAYER_TWO_COLOR, thickness=3)
+    draw_lives(canvas, "Vidas", duelo.get("vidas_oponente_2", 0), duelo.get("vidas_maximas", 0), PANEL_X + 18, 251, PLAYER_TWO_COLOR)
+
+    draw_card(canvas, (PANEL_X, 300), (1248, 414), "CRONOMETRO")
+    draw_text(canvas, "Tempo atual", (PANEL_X + 18, 343), scale=0.62, color=COLOR_MUTED)
+    draw_text(canvas, fmt_time(duelo.get("tempo_atual")), (PANEL_X + 18, 388), scale=1.2, color=COLOR_TEXT, thickness=3)
+    draw_text(canvas, "Tempo a bater", (PANEL_X + 242, 343), scale=0.62, color=COLOR_MUTED)
+    draw_text(canvas, fmt_time(duelo.get("tempo_a_bater")), (PANEL_X + 242, 388), scale=1.0, color=COLOR_WARNING, thickness=3)
+
+    draw_card(canvas, (PANEL_X, 434), (1248, 586), "MENSAGENS")
+    feedback_lines = wrap_text(duelo.get("feedback", ""), max_chars=37)
+    for index, line in enumerate(feedback_lines[:3]):
+        draw_text(canvas, line, (PANEL_X + 18, 476 + index * 28), scale=0.62, color=COLOR_SUCCESS)
+
+    transition_lines = wrap_text(duelo.get("mensagem_transicao", ""), max_chars=37)
+    for index, line in enumerate(transition_lines[:2]):
+        draw_text(canvas, line, (PANEL_X + 18, 553 + index * 24), scale=0.58, color=(255, 220, 170))
+
+    draw_card(canvas, (PANEL_X, 606), (1248, 694), "CONTROLES")
+    draw_text(canvas, "S inicia  |  ESPACO confirma  |  ENTER valida", (PANEL_X + 18, 647), scale=0.56, color=COLOR_TEXT)
+    draw_text(canvas, "T troca  |  N nova palavra  |  R reinicia  |  C limpa", (PANEL_X + 18, 676), scale=0.56, color=COLOR_TEXT)
+
+    draw_text(canvas, f"CSV: {duelo.get('fonte_dados', '')}", (PANEL_X, 714), scale=0.5, color=(150, 170, 205))
+
+
+def draw_phase_overlay(canvas, duelo):
+    phase = duelo.get("fase", "")
+    if phase == "jogando":
+        return
+
+    if phase == "aguardando_inicio":
+        title = "Rodada pronta"
+        subtitle = "Pressione S para iniciar o tempo do Oponente 1"
+        accent = tuple(duelo.get("jogador_atual_cor_bgr", [255, 255, 255]))
+    elif phase == "troca_jogador":
+        title = "Troca de jogador"
+        subtitle = duelo.get("mensagem_transicao", "") or "Pressione T para iniciar a vez do Oponente 2"
+        accent = PLAYER_TWO_COLOR
+    else:
+        winner = duelo.get("vencedor_label") or "Empate"
+        title = f"Resultado: {winner}"
+        subtitle = duelo.get("motivo_vitoria", "") or "Pressione N para nova palavra"
+        accent = COLOR_SUCCESS if duelo.get("vencedor") else COLOR_WARNING
+
+    overlay = canvas.copy()
+    cv2.rectangle(overlay, (100, 180), (730, 520), (10, 14, 24), -1)
+    cv2.addWeighted(overlay, 0.7, canvas, 0.3, 0, canvas)
+    cv2.rectangle(canvas, (100, 180), (730, 520), accent, 3)
+    draw_text(canvas, title, (135, 255), scale=1.2, color=accent, thickness=3)
+
+    y = 320
+    for line in wrap_text(subtitle, max_chars=34)[:3]:
+        draw_text(canvas, line, (135, y), scale=0.76, color=COLOR_TEXT)
+        y += 40
+
+    if phase == "resultado":
+        draw_text(
+            canvas,
+            f"O1: {fmt_time(duelo.get('tempo_oponente_1'))}   O2: {fmt_time(duelo.get('tempo_oponente_2'))}",
+            (135, 445),
+            scale=0.8,
+            color=COLOR_ACCENT,
+            thickness=2,
+        )
+    elif phase == "troca_jogador":
+        draw_text(canvas, "Pressione T para liberar a vez do Oponente 2", (135, 445), scale=0.72, color=PLAYER_TWO_COLOR, thickness=2)
+    else:
+        draw_text(canvas, "Use a mesma camera e prepare o primeiro jogador", (135, 445), scale=0.72, color=COLOR_MUTED)
+
+
+def draw_panel(frame, duelo, estado):
+    canvas = create_layout(frame)
+    draw_header(canvas, duelo, estado)
+    draw_right_panel(canvas, duelo, estado)
+    draw_phase_overlay(canvas, duelo)
+    return canvas
+
+
+async def send_action(websocket, action):
+    await websocket.send(json.dumps({"acao": action}))
+    return json.loads(await websocket.recv())
 
 
 async def main():
@@ -85,32 +242,25 @@ async def main():
 
                 estado = response.get("estado", {})
                 duelo = response.get("duelo", {})
-                draw_panel(frame, duelo, estado)
+                canvas = draw_panel(frame, duelo, estado)
 
-                cv2.imshow(WINDOW_NAME, frame)
+                cv2.imshow(WINDOW_NAME, canvas)
                 key = cv2.waitKey(1) & 0xFF
 
                 if key == ord("s"):
-                    await websocket.send(json.dumps({"acao": "iniciar_duelo"}))
-                    response = json.loads(await websocket.recv())
+                    response = await send_action(websocket, "iniciar_duelo")
                 elif key == ord(" "):
-                    await websocket.send(json.dumps({"acao": "confirmar_letra"}))
-                    response = json.loads(await websocket.recv())
+                    response = await send_action(websocket, "confirmar_letra")
                 elif key in (10, 13):
-                    await websocket.send(json.dumps({"acao": "validar_palavra_duelo"}))
-                    response = json.loads(await websocket.recv())
+                    response = await send_action(websocket, "validar_palavra_duelo")
                 elif key == ord("t"):
-                    await websocket.send(json.dumps({"acao": "trocar_jogador_duelo"}))
-                    response = json.loads(await websocket.recv())
+                    response = await send_action(websocket, "trocar_jogador_duelo")
                 elif key == ord("n"):
-                    await websocket.send(json.dumps({"acao": "proxima_palavra"}))
-                    response = json.loads(await websocket.recv())
+                    response = await send_action(websocket, "proxima_palavra")
                 elif key == ord("r"):
-                    await websocket.send(json.dumps({"acao": "reiniciar_duelo"}))
-                    response = json.loads(await websocket.recv())
+                    response = await send_action(websocket, "reiniciar_duelo")
                 elif key == ord("c"):
-                    await websocket.send(json.dumps({"acao": "limpar_palavra"}))
-                    response = json.loads(await websocket.recv())
+                    response = await send_action(websocket, "limpar_palavra")
                 elif key == 27:
                     break
     finally:
