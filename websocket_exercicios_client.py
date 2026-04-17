@@ -2,6 +2,7 @@ import asyncio
 import base64
 import json
 import sys
+import time
 from pathlib import Path
 
 import cv2
@@ -135,7 +136,7 @@ def draw_camera_header(canvas, estado, exercicio, modo_jogo):
         "palavras": "Modo Palavras",
         "misto": "Modo Misto",
     }.get(modo_jogo, "Modo Livre")
-    prompt = "Adivinhe o nome da imagem" if tipo_desafio == "imagem" else "Soletracao por palavra alvo"
+    prompt = "Adivinhe o nome da imagem" if tipo_desafio == "imagem" else "Copie a palavra alvo com os sinais"
 
     draw_text(canvas, "Desafio de LIBRAS", (28, 56), scale=1.0, thickness=3)
     draw_text(canvas, modo_label, (28, 98), scale=0.76, color=COLOR_GOLD, thickness=2)
@@ -150,15 +151,15 @@ def draw_right_panel(canvas, exercicio, estado, modo_jogo, show_hint):
     split_x = PANEL_X + 275
     border_color = COLOR_GOLD if tipo_desafio == "imagem" else COLOR_BORDER
 
-    draw_card(canvas, (PANEL_X, 26), (card_right, 170), "DESAFIO", border_color=border_color)
+    draw_card(canvas, (PANEL_X, 26), (card_right, 170), "OBJETIVO DA RODADA", border_color=border_color)
     if tipo_desafio == "imagem":
         draw_text(canvas, "Objeto/Imagem", (PANEL_X + 18, 68), scale=0.64, color=COLOR_GOLD, thickness=2)
         draw_text(canvas, "Descubra a palavra pela imagem exibida", (PANEL_X + 18, 102), scale=0.54, color=COLOR_TEXT)
         draw_text(canvas, f"Dica: {'ON' if show_hint else 'OFF'}", (PANEL_X + 18, 138), scale=0.56, color=COLOR_WARNING)
     else:
-        draw_text(canvas, "Palavra alvo", (PANEL_X + 18, 68), scale=0.64, color=COLOR_ACCENT, thickness=2)
-        draw_text(canvas, exercicio.get("palavra_alvo", ""), (PANEL_X + 18, 114), scale=0.98, color=COLOR_TEXT, thickness=3)
-        draw_text(canvas, "Sem imagem nesta rodada", (PANEL_X + 18, 146), scale=0.5, color=COLOR_MUTED)
+        draw_text(canvas, "Objetivo", (PANEL_X + 18, 68), scale=0.64, color=COLOR_ACCENT, thickness=2)
+        draw_text(canvas, exercicio.get("palavra_alvo", ""), (PANEL_X + 18, 114), scale=1.02, color=COLOR_TEXT, thickness=3)
+        draw_text(canvas, "Repita essa palavra usando os sinais em sequencia", (PANEL_X + 18, 146), scale=0.47, color=COLOR_MUTED)
 
     draw_card(canvas, (PANEL_X, 190), (card_right, 310), "PROGRESSO")
     draw_text(canvas, "Pontos", (PANEL_X + 18, 234), scale=0.54, color=COLOR_MUTED)
@@ -186,41 +187,50 @@ def draw_right_panel(canvas, exercicio, estado, modo_jogo, show_hint):
         scale=0.52,
         color=COLOR_MUTED,
     )
+    if tipo_desafio != "imagem":
+        draw_text(
+            canvas,
+            f"Tamanho da palavra: {exercicio.get('tamanho_palavra', 0)}",
+            (split_x, 450),
+            scale=0.52,
+            color=COLOR_MUTED,
+        )
 
-    draw_card(canvas, (PANEL_X, 490), (card_right, 672), "MENSAGENS")
+    draw_card(canvas, (PANEL_X, 490), (card_right, 618), "MENSAGENS")
     feedback_lines = wrap_text(exercicio.get("feedback", ""), max_chars=40)
-    for index, line in enumerate(feedback_lines[:4]):
+    for index, line in enumerate(feedback_lines[:3]):
         draw_text(canvas, line, (PANEL_X + 18, 532 + index * 28), scale=0.58, color=COLOR_SUCCESS)
 
     ultima = exercicio.get("ultima_palavra_concluida", "")
     if ultima:
-        draw_text(canvas, f"Ultima concluida: {ultima}", (PANEL_X + 18, 646), scale=0.54, color=COLOR_ACCENT, thickness=2)
+        draw_text(canvas, f"Ultima concluida: {ultima}", (PANEL_X + 18, 598), scale=0.52, color=COLOR_ACCENT, thickness=2)
 
-    draw_card(canvas, (PANEL_X, 692), (card_right, 788), "")
-    draw_text(canvas, "ESPACO confirma | C limpa | R reinicia | N proxima", (PANEL_X + 18, 730), scale=0.47, color=COLOR_TEXT)
-    draw_text(canvas, "1 facil | 2 medio | 3 dificil | F fotos | P palavras | M misto", (PANEL_X + 18, 754), scale=0.44, color=COLOR_TEXT)
-    draw_text(canvas, "H dica | ESC sai", (PANEL_X + 18, 778), scale=0.44, color=COLOR_TEXT)
+    draw_card(canvas, (PANEL_X, 638), (card_right, 728), "")
+
+    draw_card(canvas, (PANEL_X, 746), (card_right, 788), "")
+    draw_text(canvas, "ESPACO confirma | C limpa | R reinicia | N proxima", (PANEL_X + 18, 766), scale=0.43, color=COLOR_TEXT)
+    draw_text(canvas, "1/2/3 dificuldade | F/P/M modo | H dica | ESC sai", (PANEL_X + 18, 786), scale=0.41, color=COLOR_TEXT)
 
     draw_text(canvas, f"CSV: {exercicio.get('fonte_dados', '')}", (PANEL_X, 808), scale=0.4, color=(150, 170, 205), thickness=1)
 
 
-def draw_success_badge(canvas, exercicio):
-    if not exercicio.get("ultima_palavra_concluida"):
+def draw_success_badge(canvas, success_word):
+    if not success_word:
         return
 
     overlay = canvas.copy()
-    cv2.rectangle(overlay, (28, FRAME_HEIGHT - 165), (390, FRAME_HEIGHT - 48), (28, 70, 42), -1)
+    cv2.rectangle(overlay, (PANEL_X, 638), (PANEL_X + PANEL_WIDTH, 728), (28, 70, 42), -1)
     cv2.addWeighted(overlay, 0.82, canvas, 0.18, 0, canvas)
-    cv2.rectangle(canvas, (28, FRAME_HEIGHT - 165), (390, FRAME_HEIGHT - 48), (120, 255, 180), 2)
-    draw_text(canvas, "ACERTOU!", (54, FRAME_HEIGHT - 118), scale=0.96, color=(120, 255, 180), thickness=3)
-    draw_text(canvas, exercicio.get("ultima_palavra_concluida", ""), (54, FRAME_HEIGHT - 78), scale=0.76, color=COLOR_TEXT, thickness=2)
+    cv2.rectangle(canvas, (PANEL_X, 638), (PANEL_X + PANEL_WIDTH, 728), (120, 255, 180), 2)
+    draw_text(canvas, "ACERTOU!", (PANEL_X + 18, 680), scale=0.92, color=(120, 255, 180), thickness=3)
+    draw_text(canvas, success_word, (PANEL_X + 18, 716), scale=0.72, color=COLOR_TEXT, thickness=2)
 
 
-def build_exercise_canvas(frame, estado, exercicio, modo_jogo, show_hint):
+def build_exercise_canvas(frame, estado, exercicio, modo_jogo, show_hint, success_word):
     canvas = create_layout(frame)
     draw_camera_header(canvas, estado, exercicio, modo_jogo)
     draw_right_panel(canvas, exercicio, estado, modo_jogo, show_hint)
-    draw_success_badge(canvas, exercicio)
+    draw_success_badge(canvas, success_word)
     return canvas
 
 
@@ -241,6 +251,8 @@ async def main():
     current_image_frame = None
     show_hint = False
     initial_game_mode = get_initial_game_mode()
+    last_success_word = ""
+    success_visible_until = 0.0
 
     try:
         async with connect(SERVER_URL, max_size=2**22) as websocket:
@@ -264,8 +276,15 @@ async def main():
                 imagem_caminho = exercicio.get("imagem_caminho", "")
                 modo_jogo = exercicio.get("modo_jogo", "misto")
                 dica = exercicio.get("dica", "")
+                ultima_concluida = exercicio.get("ultima_palavra_concluida", "")
 
-                canvas = build_exercise_canvas(frame, estado, exercicio, modo_jogo, show_hint)
+                if ultima_concluida and ultima_concluida != last_success_word:
+                    last_success_word = ultima_concluida
+                    success_visible_until = time.monotonic() + 1.75
+
+                success_word = last_success_word if time.monotonic() < success_visible_until else ""
+
+                canvas = build_exercise_canvas(frame, estado, exercicio, modo_jogo, show_hint, success_word)
 
                 if tipo_desafio == "imagem" and imagem_caminho:
                     resolved_image_path = (PROJECT_ROOT / imagem_caminho).resolve()
