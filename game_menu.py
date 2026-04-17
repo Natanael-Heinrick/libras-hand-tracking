@@ -17,6 +17,8 @@ PROJECT_ROOT = Path(__file__).resolve().parent
 PYTHON_EXECUTABLE = sys.executable
 SERVER_HOST = "127.0.0.1"
 SERVER_PORT = 8765
+CANVAS_WIDTH = 1280
+CANVAS_HEIGHT = 980
 
 BUTTONS = [
     {
@@ -29,7 +31,7 @@ BUTTONS = [
         "x1": 80,
         "y1": 170,
         "x2": 560,
-        "y2": 300,
+        "y2": 320,
     },
     {
         "label": "2. Palavras",
@@ -39,9 +41,9 @@ BUTTONS = [
         "args": ["palavras"],
         "requires_server": True,
         "x1": 80,
-        "y1": 340,
+        "y1": 360,
         "x2": 560,
-        "y2": 470,
+        "y2": 510,
     },
     {
         "label": "3. Imagens de Letras",
@@ -51,9 +53,9 @@ BUTTONS = [
         "args": [],
         "requires_server": False,
         "x1": 80,
-        "y1": 510,
+        "y1": 550,
         "x2": 560,
-        "y2": 640,
+        "y2": 700,
     },
     {
         "label": "4. Loja",
@@ -62,10 +64,10 @@ BUTTONS = [
         "entry": "loja.shop_app",
         "args": [],
         "requires_server": False,
-        "x1": 620,
-        "y1": 510,
-        "x2": 1100,
-        "y2": 640,
+        "x1": 80,
+        "y1": 740,
+        "x2": 560,
+        "y2": 890,
     },
     {
         "label": "5. Duelo de Tempo",
@@ -77,7 +79,7 @@ BUTTONS = [
         "x1": 620,
         "y1": 170,
         "x2": 1100,
-        "y2": 300,
+        "y2": 320,
     },
 ]
 
@@ -118,10 +120,52 @@ def launch_button(button: dict):
     )
 
 
+def wrap_text(text: str, max_chars: int) -> list[str]:
+    words = (text or "").split()
+    if not words:
+        return []
+
+    lines = []
+    current = words[0]
+    for word in words[1:]:
+        candidate = f"{current} {word}"
+        if len(candidate) <= max_chars:
+            current = candidate
+        else:
+            lines.append(current)
+            current = word
+    lines.append(current)
+    return lines
+
+
+def draw_text_block(
+    canvas: np.ndarray,
+    lines: list[str],
+    start_x: int,
+    start_y: int,
+    scale: float = 0.58,
+    color: tuple[int, int, int] = (235, 235, 235),
+    thickness: int = 2,
+    line_height: int = 28,
+):
+    y = start_y
+    for line in lines:
+        cv2.putText(
+            canvas,
+            line,
+            (start_x, y),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            scale,
+            color,
+            thickness,
+        )
+        y += line_height
+
+
 def draw_menu() -> np.ndarray:
-    canvas = np.full((720, 1280, 3), (16, 22, 32), dtype=np.uint8)
-    cv2.rectangle(canvas, (0, 0), (1280, 140), (29, 44, 70), -1)
-    cv2.rectangle(canvas, (620, 170), (1210, 470), (28, 36, 52), -1)
+    canvas = np.full((CANVAS_HEIGHT, CANVAS_WIDTH, 3), (16, 22, 32), dtype=np.uint8)
+    cv2.rectangle(canvas, (0, 0), (CANVAS_WIDTH, 140), (29, 44, 70), -1)
+    cv2.rectangle(canvas, (620, 360), (1210, 890), (28, 36, 52), -1)
 
     cv2.putText(canvas, "Central de Jogos LIBRAS", (70, 80), cv2.FONT_HERSHEY_SIMPLEX, 1.2, (255, 255, 255), 3)
     cv2.putText(canvas, "Clique em uma opcao ou pressione 1, 2, 3, 4 ou 5.", (70, 115), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (220, 220, 220), 2)
@@ -131,16 +175,40 @@ def draw_menu() -> np.ndarray:
         cv2.rectangle(canvas, (button["x1"], button["y1"]), (button["x2"], button["y2"]), (55, 93, 145), -1)
         cv2.rectangle(canvas, (button["x1"], button["y1"]), (button["x2"], button["y2"]), (120, 180, 255), 2)
         cv2.putText(canvas, button["label"], (button["x1"] + 25, button["y1"] + 45), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (255, 255, 255), 2)
-        cv2.putText(canvas, button["description"], (button["x1"] + 25, button["y1"] + 88), cv2.FONT_HERSHEY_SIMPLEX, 0.58, (235, 235, 235), 2)
+        draw_text_block(
+            canvas,
+            wrap_text(button["description"], max_chars=40)[:3],
+            button["x1"] + 25,
+            button["y1"] + 88,
+            scale=0.56,
+            color=(235, 235, 235),
+            thickness=2,
+            line_height=28,
+        )
 
-    cv2.putText(canvas, "Como funciona", (650, 230), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (255, 220, 140), 2)
-    cv2.putText(canvas, "Fotos: abre o jogo de imagens de objetos.", (650, 290), cv2.FONT_HERSHEY_SIMPLEX, 0.65, (255, 255, 255), 2)
-    cv2.putText(canvas, "Palavras: abre o jogo com palavras do CSV.", (650, 330), cv2.FONT_HERSHEY_SIMPLEX, 0.65, (255, 255, 255), 2)
-    cv2.putText(canvas, "Imagens de Letras: quiz visual local com vidas.", (650, 370), cv2.FONT_HERSHEY_SIMPLEX, 0.65, (255, 255, 255), 2)
-    cv2.putText(canvas, "Loja: compra e equipa looks com os pontos salvos.", (650, 410), cv2.FONT_HERSHEY_SIMPLEX, 0.65, (255, 255, 255), 2)
-    cv2.putText(canvas, "Duelo: base do novo modo 1x1 por tempo na mesma camera.", (650, 250), cv2.FONT_HERSHEY_SIMPLEX, 0.65, (255, 255, 255), 2)
-    cv2.putText(canvas, "O servidor WebSocket sobe sozinho quando necessario.", (650, 450), cv2.FONT_HERSHEY_SIMPLEX, 0.62, (190, 230, 255), 2)
-    cv2.putText(canvas, "ESC fecha o menu.", (650, 485), cv2.FONT_HERSHEY_SIMPLEX, 0.62, (190, 230, 255), 2)
+    cv2.putText(canvas, "Como funciona", (650, 400), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (255, 220, 140), 2)
+    info_lines = [
+        "Duelo: base do novo modo 1x1 por tempo na mesma camera.",
+        "Fotos: abre o jogo de imagens de objetos.",
+        "Palavras: abre o jogo com palavras do CSV.",
+        "Imagens de Letras: quiz visual local com vidas.",
+        "Loja: compra e equipa looks com os pontos salvos.",
+        "O servidor WebSocket sobe sozinho quando necessario.",
+        "ESC fecha o menu.",
+    ]
+    wrapped_info_lines = []
+    for line in info_lines:
+        wrapped_info_lines.extend(wrap_text(line, max_chars=45))
+    draw_text_block(
+        canvas,
+        wrapped_info_lines,
+        650,
+        440,
+        scale=0.60,
+        color=(255, 255, 255),
+        thickness=2,
+        line_height=34,
+    )
     return canvas
 
 
@@ -163,8 +231,8 @@ def main():
     while True:
         canvas = draw_menu()
         if selected_script:
-            cv2.putText(canvas, f"Aberto: {selected_script}", (650, 560), cv2.FONT_HERSHEY_SIMPLEX, 0.75, (150, 255, 150), 2)
-            cv2.putText(canvas, "Voce pode voltar aqui e abrir outro jogo.", (650, 600), cv2.FONT_HERSHEY_SIMPLEX, 0.62, (220, 220, 220), 2)
+            cv2.putText(canvas, f"Aberto: {selected_script}", (650, 910), cv2.FONT_HERSHEY_SIMPLEX, 0.75, (150, 255, 150), 2)
+            cv2.putText(canvas, "Voce pode voltar aqui e abrir outro jogo.", (650, 945), cv2.FONT_HERSHEY_SIMPLEX, 0.62, (220, 220, 220), 2)
 
         cv2.imshow(WINDOW_NAME, canvas)
         key = cv2.waitKey(30) & 0xFF
