@@ -2,15 +2,60 @@ import asyncio
 import base64
 import json
 import sys
+import time
 from pathlib import Path
 
 import cv2
+import numpy as np
 from websockets.asyncio.client import connect
 
 
 SERVER_URL = "ws://127.0.0.1:8765/exercicios"
 PROJECT_ROOT = Path(__file__).resolve().parent
 CHALLENGE_WINDOW = "Desafio por Imagem"
+WINDOW_NAME = "Hand Tracking - Exercicios"
+FRAME_WIDTH = 1460
+FRAME_HEIGHT = 820
+CAMERA_WIDTH = 860
+PANEL_X = 890
+PANEL_WIDTH = 540
+COLOR_BG = (17, 24, 36)
+COLOR_PANEL = (29, 38, 56)
+COLOR_BORDER = (95, 155, 235)
+COLOR_TEXT = (245, 248, 255)
+COLOR_MUTED = (180, 196, 220)
+COLOR_ACCENT = (100, 225, 255)
+COLOR_SUCCESS = (150, 240, 170)
+COLOR_WARNING = (125, 195, 255)
+COLOR_GOLD = (105, 220, 255)
+
+
+def draw_text(canvas, text, position, scale=0.8, color=COLOR_TEXT, thickness=2):
+    cv2.putText(
+        canvas,
+        str(text),
+        position,
+        cv2.FONT_HERSHEY_SIMPLEX,
+        scale,
+        color,
+        thickness,
+        cv2.LINE_AA,
+    )
+
+
+def draw_text_right(canvas, text, x_right, baseline_y, scale=0.8, color=COLOR_TEXT, thickness=2):
+    text = str(text)
+    (text_width, _), _ = cv2.getTextSize(text, cv2.FONT_HERSHEY_SIMPLEX, scale, thickness)
+    draw_text(canvas, text, (x_right - text_width, baseline_y), scale=scale, color=color, thickness=thickness)
+
+
+def draw_card(canvas, top_left, bottom_right, title="", border_color=COLOR_BORDER):
+    x1, y1 = top_left
+    x2, y2 = bottom_right
+    cv2.rectangle(canvas, (x1, y1), (x2, y2), COLOR_PANEL, -1)
+    cv2.rectangle(canvas, (x1, y1), (x2, y2), border_color, 2)
+    if title:
+        draw_text(canvas, title, (x1 + 18, y1 + 30), scale=0.58, color=(230, 236, 255), thickness=2)
 
 
 def encode_frame(frame, quality=70):
@@ -30,17 +75,9 @@ def close_challenge_window():
 
 def draw_hint_overlay(image, hint_text):
     overlay = image.copy()
-    cv2.rectangle(overlay, (10, 10), (overlay.shape[1] - 10, 70), (35, 45, 75), -1)
+    cv2.rectangle(overlay, (10, 10), (overlay.shape[1] - 10, 74), (35, 45, 75), -1)
     cv2.addWeighted(overlay, 0.78, image, 0.22, 0, image)
-    cv2.putText(
-        image,
-        f"Dica: {hint_text}",
-        (20, 48),
-        cv2.FONT_HERSHEY_SIMPLEX,
-        0.65,
-        (220, 235, 255),
-        2,
-    )
+    draw_text(image, f"Dica: {hint_text}", (20, 50), scale=0.63, color=(220, 235, 255), thickness=2)
 
 
 def wrap_text(text, max_chars=42):
@@ -70,6 +107,141 @@ def get_initial_game_mode():
     return selected_mode if selected_mode in valid_modes else "misto"
 
 
+def fit_image(image, max_width, max_height):
+    height, width = image.shape[:2]
+    scale = min(max_width / max(width, 1), max_height / max(height, 1))
+    size = (max(1, int(width * scale)), max(1, int(height * scale)))
+    return cv2.resize(image, size)
+
+
+def create_layout(frame):
+    camera_view = cv2.resize(frame, (CAMERA_WIDTH, FRAME_HEIGHT))
+    canvas = np.full((FRAME_HEIGHT, FRAME_WIDTH, 3), COLOR_BG, dtype=np.uint8)
+    canvas[:, :CAMERA_WIDTH] = camera_view
+
+    overlay = canvas.copy()
+    cv2.rectangle(overlay, (0, 0), (CAMERA_WIDTH, 160), (11, 18, 30), -1)
+    cv2.rectangle(overlay, (0, FRAME_HEIGHT - 170), (CAMERA_WIDTH, FRAME_HEIGHT), (11, 18, 30), -1)
+    cv2.addWeighted(overlay, 0.28, canvas, 0.72, 0, canvas)
+
+    cv2.rectangle(canvas, (CAMERA_WIDTH, 0), (FRAME_WIDTH, FRAME_HEIGHT), (16, 22, 34), -1)
+    cv2.rectangle(canvas, (CAMERA_WIDTH + 8, 14), (FRAME_WIDTH - 14, FRAME_HEIGHT - 14), (38, 54, 82), 2)
+    return canvas
+
+
+def draw_camera_header(canvas, estado, exercicio, modo_jogo):
+    tipo_desafio = exercicio.get("tipo_desafio", "palavra")
+    modo_label = {
+        "fotos": "Modo Fotos",
+        "palavras": "Modo Palavras",
+        "misto": "Modo Misto",
+    }.get(modo_jogo, "Modo Livre")
+    prompt = "Adivinhe o nome da imagem" if tipo_desafio == "imagem" else "Copie a palavra alvo com os sinais"
+
+    draw_text(canvas, "Desafio de LIBRAS", (28, 56), scale=1.0, thickness=3)
+    draw_text(canvas, modo_label, (28, 98), scale=0.76, color=COLOR_GOLD, thickness=2)
+    draw_text(canvas, prompt, (28, 136), scale=0.72, color=COLOR_ACCENT, thickness=2)
+    draw_text(canvas, f"Sua palavra: {estado.get('palavra', '') or '_'}", (28, 178), scale=0.88, color=(255, 242, 120), thickness=2)
+    draw_text(canvas, f"Letra atual: {estado.get('letra_estavel') or estado.get('letra') or '--'}", (28, 216), scale=0.76, color=COLOR_SUCCESS, thickness=2)
+
+
+def draw_right_panel(canvas, exercicio, estado, modo_jogo, show_hint):
+    tipo_desafio = exercicio.get("tipo_desafio", "palavra")
+    card_right = PANEL_X + PANEL_WIDTH
+    split_x = PANEL_X + 275
+    border_color = COLOR_GOLD if tipo_desafio == "imagem" else COLOR_BORDER
+
+    draw_card(canvas, (PANEL_X, 26), (card_right, 170), "OBJETIVO DA RODADA", border_color=border_color)
+    if tipo_desafio == "imagem":
+        draw_text(canvas, "Objeto/Imagem", (PANEL_X + 18, 68), scale=0.64, color=COLOR_GOLD, thickness=2)
+        draw_text(canvas, "Descubra a palavra pela imagem exibida", (PANEL_X + 18, 102), scale=0.54, color=COLOR_TEXT)
+        draw_text(canvas, f"Dica: {'ON' if show_hint else 'OFF'}", (PANEL_X + 18, 138), scale=0.56, color=COLOR_WARNING)
+    else:
+        draw_text(canvas, "Objetivo", (PANEL_X + 18, 68), scale=0.64, color=COLOR_ACCENT, thickness=2)
+        draw_text(canvas, exercicio.get("palavra_alvo", ""), (PANEL_X + 18, 114), scale=1.02, color=COLOR_TEXT, thickness=3)
+        draw_text(canvas, "Repita essa palavra usando os sinais em sequencia", (PANEL_X + 18, 146), scale=0.47, color=COLOR_MUTED)
+
+    draw_card(canvas, (PANEL_X, 190), (card_right, 310), "PROGRESSO")
+    draw_text(canvas, "Pontos", (PANEL_X + 18, 234), scale=0.54, color=COLOR_MUTED)
+    draw_text(canvas, str(exercicio.get("pontuacao", 0)), (PANEL_X + 18, 280), scale=1.02, color=COLOR_TEXT, thickness=3)
+    draw_text(canvas, "Nivel", (split_x, 234), scale=0.54, color=COLOR_MUTED)
+    draw_text(canvas, str(exercicio.get("nivel", 1)), (split_x, 280), scale=1.02, color=COLOR_TEXT, thickness=3)
+    draw_text(canvas, f"Dificuldade: {exercicio.get('dificuldade', '')}", (PANEL_X + 18, 302), scale=0.52, color=COLOR_GOLD)
+
+    draw_card(canvas, (PANEL_X, 330), (card_right, 470), "RODADA")
+    draw_text(canvas, "Modo", (PANEL_X + 18, 374), scale=0.54, color=COLOR_MUTED)
+    draw_text(canvas, modo_jogo, (PANEL_X + 18, 418), scale=0.72, color=COLOR_TEXT, thickness=2)
+    draw_text(canvas, "Desafio", (split_x, 374), scale=0.54, color=COLOR_MUTED)
+    draw_text(
+        canvas,
+        f"{exercicio.get('indice_palavra', 0) + 1}/{exercicio.get('total_palavras', 0)}",
+        (split_x, 418),
+        scale=0.72,
+        color=COLOR_TEXT,
+        thickness=2,
+    )
+    draw_text(
+        canvas,
+        f"Pontos por acerto: {exercicio.get('pontos_por_acerto', 1)}",
+        (PANEL_X + 18, 450),
+        scale=0.52,
+        color=COLOR_MUTED,
+    )
+    if tipo_desafio != "imagem":
+        draw_text(
+            canvas,
+            f"Tamanho da palavra: {exercicio.get('tamanho_palavra', 0)}",
+            (split_x, 450),
+            scale=0.52,
+            color=COLOR_MUTED,
+        )
+
+    draw_card(canvas, (PANEL_X, 490), (card_right, 618), "MENSAGENS")
+    feedback_lines = wrap_text(exercicio.get("feedback", ""), max_chars=40)
+    for index, line in enumerate(feedback_lines[:3]):
+        draw_text(canvas, line, (PANEL_X + 18, 532 + index * 28), scale=0.58, color=COLOR_SUCCESS)
+
+    ultima = exercicio.get("ultima_palavra_concluida", "")
+    if ultima:
+        draw_text(canvas, f"Ultima concluida: {ultima}", (PANEL_X + 18, 598), scale=0.52, color=COLOR_ACCENT, thickness=2)
+
+    draw_card(canvas, (PANEL_X, 638), (card_right, 728), "")
+
+    draw_card(canvas, (PANEL_X, 746), (card_right, 788), "")
+    draw_text(canvas, "ESPACO confirma | C limpa | R reinicia | N proxima", (PANEL_X + 18, 766), scale=0.43, color=COLOR_TEXT)
+    draw_text(canvas, "1/2/3 dificuldade | F/P/M modo | H dica | ESC sai", (PANEL_X + 18, 786), scale=0.41, color=COLOR_TEXT)
+
+    draw_text(canvas, f"CSV: {exercicio.get('fonte_dados', '')}", (PANEL_X, 808), scale=0.4, color=(150, 170, 205), thickness=1)
+
+
+def draw_success_badge(canvas, success_word):
+    if not success_word:
+        return
+
+    overlay = canvas.copy()
+    cv2.rectangle(overlay, (PANEL_X, 638), (PANEL_X + PANEL_WIDTH, 728), (28, 70, 42), -1)
+    cv2.addWeighted(overlay, 0.82, canvas, 0.18, 0, canvas)
+    cv2.rectangle(canvas, (PANEL_X, 638), (PANEL_X + PANEL_WIDTH, 728), (120, 255, 180), 2)
+    draw_text(canvas, "ACERTOU!", (PANEL_X + 18, 680), scale=0.92, color=(120, 255, 180), thickness=3)
+    draw_text(canvas, success_word, (PANEL_X + 18, 716), scale=0.72, color=COLOR_TEXT, thickness=2)
+
+
+def build_exercise_canvas(frame, estado, exercicio, modo_jogo, show_hint, success_word):
+    canvas = create_layout(frame)
+    draw_camera_header(canvas, estado, exercicio, modo_jogo)
+    draw_right_panel(canvas, exercicio, estado, modo_jogo, show_hint)
+    draw_success_badge(canvas, success_word)
+    return canvas
+
+
+async def send_action(websocket, payload):
+    await websocket.send(json.dumps(payload))
+    response = json.loads(await websocket.recv())
+    if response.get("tipo") == "erro":
+        raise RuntimeError(response.get("mensagem", "Erro na acao enviada"))
+    return response
+
+
 async def main():
     camera = cv2.VideoCapture(0, cv2.CAP_DSHOW)
     if not camera.isOpened():
@@ -79,14 +251,13 @@ async def main():
     current_image_frame = None
     show_hint = False
     initial_game_mode = get_initial_game_mode()
+    last_success_word = ""
+    success_visible_until = 0.0
 
     try:
         async with connect(SERVER_URL, max_size=2**22) as websocket:
             if initial_game_mode != "misto":
-                await websocket.send(json.dumps({"acao": "definir_modo_jogo", "modo_jogo": initial_game_mode}))
-                response = json.loads(await websocket.recv())
-                if response.get("tipo") == "erro":
-                    raise RuntimeError(response.get("mensagem", "Erro ao definir modo de jogo"))
+                await send_action(websocket, {"acao": "definir_modo_jogo", "modo_jogo": initial_game_mode})
 
             while True:
                 ok, frame = camera.read()
@@ -101,157 +272,19 @@ async def main():
 
                 estado = response.get("estado", {})
                 exercicio = response.get("exercicio", {})
-                letra = estado.get("letra_estavel") or estado.get("letra") or ""
                 tipo_desafio = exercicio.get("tipo_desafio", "palavra")
                 imagem_caminho = exercicio.get("imagem_caminho", "")
                 modo_jogo = exercicio.get("modo_jogo", "misto")
                 dica = exercicio.get("dica", "")
-                wrapped_hint = wrap_text(f"Dica: {dica}", max_chars=44) if show_hint and dica else []
+                ultima_concluida = exercicio.get("ultima_palavra_concluida", "")
 
-                cv2.putText(frame, "Rota: /exercicios", (30, 35), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 255), 2)
-                cv2.putText(frame, f"Letra: {letra}", (30, 75), cv2.FONT_HERSHEY_SIMPLEX, 1.1, (0, 255, 0), 3)
-                cv2.putText(
-                    frame,
-                    f"Sua palavra: {estado.get('palavra', '')}",
-                    (30, 115),
-                    cv2.FONT_HERSHEY_SIMPLEX,
-                    0.9,
-                    (255, 255, 0),
-                    2,
-                )
-                if tipo_desafio == "imagem":
-                    cv2.putText(
-                        frame,
-                        "Desafio: adivinhe o nome da imagem",
-                        (30, 155),
-                        cv2.FONT_HERSHEY_SIMPLEX,
-                        0.8,
-                        (0, 200, 255),
-                        2,
-                    )
-                    if show_hint and dica:
-                        box_bottom = 165 + max(45, len(wrapped_hint) * 24 + 20)
-                        cv2.rectangle(frame, (20, 165), (620, box_bottom), (45, 60, 90), -1)
-                        for index, line in enumerate(wrapped_hint):
-                            cv2.putText(
-                                frame,
-                                line,
-                                (30, 193 + index * 24),
-                                cv2.FONT_HERSHEY_SIMPLEX,
-                                0.62,
-                                (180, 220, 255),
-                                2,
-                            )
-                    else:
-                        cv2.putText(
-                            frame,
-                            "Dica oculta. Pressione H para mostrar.",
-                            (30, 185),
-                            cv2.FONT_HERSHEY_SIMPLEX,
-                            0.65,
-                            (180, 220, 255),
-                            2,
-                        )
-                else:
-                    cv2.putText(
-                        frame,
-                        f"Alvo: {exercicio.get('palavra_alvo', '')}",
-                        (30, 155),
-                        cv2.FONT_HERSHEY_SIMPLEX,
-                        0.9,
-                        (0, 200, 255),
-                        2,
-                    )
-                cv2.putText(
-                    frame,
-                    f"Dica: {'ON' if show_hint else 'OFF'}",
-                    (30, 245),
-                    cv2.FONT_HERSHEY_SIMPLEX,
-                    0.7,
-                    (255, 220, 180),
-                    2,
-                )
-                cv2.putText(
-                    frame,
-                    (
-                        f"Pontos: {exercicio.get('pontuacao', 0)} | "
-                        f"Nivel: {exercicio.get('nivel', 1)} | "
-                        f"{exercicio.get('dificuldade', '')} ({exercicio.get('pontos_por_acerto', 1)} pts)"
-                    ),
-                    (30, 275),
-                    cv2.FONT_HERSHEY_SIMPLEX,
-                    0.7,
-                    (255, 255, 255),
-                    2,
-                )
-                cv2.putText(
-                    frame,
-                    f"Modo: {modo_jogo}",
-                    (30, 205),
-                    cv2.FONT_HERSHEY_SIMPLEX,
-                    0.7,
-                    (255, 255, 255),
-                    2,
-                )
-                cv2.putText(
-                    frame,
-                    f"Feedback: {exercicio.get('feedback', '')}",
-                    (30, 305),
-                    cv2.FONT_HERSHEY_SIMPLEX,
-                    0.7,
-                    (200, 255, 200),
-                    2,
-                )
-                cv2.putText(
-                    frame,
-                    (
-                        f"Filtro: {exercicio.get('dificuldade_selecionada', '')} | "
-                        f"Desafio: {exercicio.get('indice_palavra', 0) + 1}/{exercicio.get('total_palavras', 0)}"
-                    ),
-                    (30, 335),
-                    cv2.FONT_HERSHEY_SIMPLEX,
-                    0.65,
-                    (255, 220, 180),
-                    2,
-                )
-                cv2.putText(
-                    frame,
-                    f"Ultima concluida: {exercicio.get('ultima_palavra_concluida', '')}",
-                    (30, 360),
-                    cv2.FONT_HERSHEY_SIMPLEX,
-                    0.65,
-                    (180, 255, 180),
-                    2,
-                )
-                cv2.putText(
-                    frame,
-                    "ESPACO confirma | C limpa | R reinicia | N proxima manual | H dica",
-                    (30, 395),
-                    cv2.FONT_HERSHEY_SIMPLEX,
-                    0.56,
-                    (255, 255, 255),
-                    2,
-                )
-                cv2.putText(
-                    frame,
-                    "1 facil | 2 medio | 3 dificil | F fotos | P palavras | M misto | ESC sai",
-                    (30, 420),
-                    cv2.FONT_HERSHEY_SIMPLEX,
-                    0.55,
-                    (255, 255, 255),
-                    2,
-                )
+                if ultima_concluida and ultima_concluida != last_success_word:
+                    last_success_word = ultima_concluida
+                    success_visible_until = time.monotonic() + 1.75
 
-                if exercicio.get("ultima_palavra_concluida"):
-                    cv2.putText(
-                        frame,
-                        "ACERTOU!",
-                        (30, 460),
-                        cv2.FONT_HERSHEY_SIMPLEX,
-                        1.2,
-                        (0, 255, 0),
-                        3,
-                    )
+                success_word = last_success_word if time.monotonic() < success_visible_until else ""
+
+                canvas = build_exercise_canvas(frame, estado, exercicio, modo_jogo, show_hint, success_word)
 
                 if tipo_desafio == "imagem" and imagem_caminho:
                     resolved_image_path = (PROJECT_ROOT / imagem_caminho).resolve()
@@ -261,10 +294,19 @@ async def main():
                         current_image_frame = None
 
                         if challenge_image is not None:
-                            current_image_frame = cv2.resize(challenge_image, (420, 420))
+                            current_image_frame = fit_image(challenge_image, 520, 520)
 
                     if current_image_frame is not None:
-                        challenge_view = current_image_frame.copy()
+                        challenge_view = np.full((620, 620, 3), (18, 24, 38), dtype=np.uint8)
+                        cv2.rectangle(challenge_view, (24, 24), (596, 596), (30, 40, 58), -1)
+                        cv2.rectangle(challenge_view, (24, 24), (596, 596), (105, 160, 235), 2)
+                        image_y = 60 + (500 - current_image_frame.shape[0]) // 2
+                        image_x = 60 + (500 - current_image_frame.shape[1]) // 2
+                        challenge_view[
+                            image_y : image_y + current_image_frame.shape[0],
+                            image_x : image_x + current_image_frame.shape[1],
+                        ] = current_image_frame
+                        draw_text(challenge_view, "Imagem do Desafio", (52, 48), scale=0.74, color=COLOR_TEXT, thickness=2)
                         if show_hint and dica:
                             draw_hint_overlay(challenge_view, dica)
                         cv2.imshow(CHALLENGE_WINDOW, challenge_view)
@@ -273,66 +315,36 @@ async def main():
                     current_image_frame = None
                     close_challenge_window()
 
-                cv2.imshow("Hand Tracking - Exercicios", frame)
+                cv2.imshow(WINDOW_NAME, canvas)
                 key = cv2.waitKey(1) & 0xFF
 
                 if key == ord(" "):
-                    await websocket.send(json.dumps({"acao": "confirmar_letra"}))
-                    response = json.loads(await websocket.recv())
-                    if response.get("tipo") == "erro":
-                        raise RuntimeError(response.get("mensagem", "Erro ao confirmar letra"))
+                    await send_action(websocket, {"acao": "confirmar_letra"})
                 elif key == ord("c"):
-                    await websocket.send(json.dumps({"acao": "limpar_palavra"}))
-                    response = json.loads(await websocket.recv())
-                    if response.get("tipo") == "erro":
-                        raise RuntimeError(response.get("mensagem", "Erro ao limpar palavra"))
+                    await send_action(websocket, {"acao": "limpar_palavra"})
                 elif key == ord("r"):
-                    await websocket.send(json.dumps({"acao": "reiniciar_exercicio"}))
-                    response = json.loads(await websocket.recv())
-                    if response.get("tipo") == "erro":
-                        raise RuntimeError(response.get("mensagem", "Erro ao reiniciar exercicio"))
+                    await send_action(websocket, {"acao": "reiniciar_exercicio"})
                     show_hint = False
                 elif key == ord("n"):
-                    await websocket.send(json.dumps({"acao": "proxima_palavra"}))
-                    response = json.loads(await websocket.recv())
-                    if response.get("tipo") == "erro":
-                        raise RuntimeError(response.get("mensagem", "Erro ao avancar palavra"))
+                    await send_action(websocket, {"acao": "proxima_palavra"})
                     show_hint = False
                 elif key == ord("1"):
-                    await websocket.send(json.dumps({"acao": "definir_dificuldade", "dificuldade": "facil"}))
-                    response = json.loads(await websocket.recv())
-                    if response.get("tipo") == "erro":
-                        raise RuntimeError(response.get("mensagem", "Erro ao definir dificuldade"))
+                    await send_action(websocket, {"acao": "definir_dificuldade", "dificuldade": "facil"})
                     show_hint = False
                 elif key == ord("2"):
-                    await websocket.send(json.dumps({"acao": "definir_dificuldade", "dificuldade": "medio"}))
-                    response = json.loads(await websocket.recv())
-                    if response.get("tipo") == "erro":
-                        raise RuntimeError(response.get("mensagem", "Erro ao definir dificuldade"))
+                    await send_action(websocket, {"acao": "definir_dificuldade", "dificuldade": "medio"})
                     show_hint = False
                 elif key == ord("3"):
-                    await websocket.send(json.dumps({"acao": "definir_dificuldade", "dificuldade": "dificil"}))
-                    response = json.loads(await websocket.recv())
-                    if response.get("tipo") == "erro":
-                        raise RuntimeError(response.get("mensagem", "Erro ao definir dificuldade"))
+                    await send_action(websocket, {"acao": "definir_dificuldade", "dificuldade": "dificil"})
                     show_hint = False
                 elif key == ord("f"):
-                    await websocket.send(json.dumps({"acao": "definir_modo_jogo", "modo_jogo": "fotos"}))
-                    response = json.loads(await websocket.recv())
-                    if response.get("tipo") == "erro":
-                        raise RuntimeError(response.get("mensagem", "Erro ao definir modo de jogo"))
+                    await send_action(websocket, {"acao": "definir_modo_jogo", "modo_jogo": "fotos"})
                     show_hint = False
                 elif key == ord("p"):
-                    await websocket.send(json.dumps({"acao": "definir_modo_jogo", "modo_jogo": "palavras"}))
-                    response = json.loads(await websocket.recv())
-                    if response.get("tipo") == "erro":
-                        raise RuntimeError(response.get("mensagem", "Erro ao definir modo de jogo"))
+                    await send_action(websocket, {"acao": "definir_modo_jogo", "modo_jogo": "palavras"})
                     show_hint = False
                 elif key == ord("m"):
-                    await websocket.send(json.dumps({"acao": "definir_modo_jogo", "modo_jogo": "misto"}))
-                    response = json.loads(await websocket.recv())
-                    if response.get("tipo") == "erro":
-                        raise RuntimeError(response.get("mensagem", "Erro ao definir modo de jogo"))
+                    await send_action(websocket, {"acao": "definir_modo_jogo", "modo_jogo": "misto"})
                     show_hint = False
                 elif key in (ord("h"), ord("H"), ord("4")):
                     show_hint = not show_hint
