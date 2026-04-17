@@ -9,6 +9,7 @@ from websockets.asyncio.client import connect
 
 SERVER_URL = "ws://127.0.0.1:8765/duelo"
 WINDOW_NAME = "Duelo de Tempo LIBRAS"
+NAME_WINDOW = "Registro dos Jogadores"
 FRAME_WIDTH = 1460
 FRAME_HEIGHT = 720
 CAMERA_WIDTH = 820
@@ -25,6 +26,8 @@ COLOR_WARNING = (130, 190, 255)
 COLOR_DANGER = (160, 180, 255)
 PLAYER_ONE_COLOR = (255, 120, 0)
 PLAYER_TWO_COLOR = (0, 140, 255)
+PLAYER_ONE_ID = "oponente_1"
+PLAYER_TWO_ID = "oponente_2"
 
 
 def draw_text(canvas, text, position, scale=0.8, color=COLOR_TEXT, thickness=2):
@@ -70,6 +73,143 @@ def draw_card(canvas, top_left, bottom_right, title, border_color=COLOR_BORDER):
         color=(230, 236, 255),
         thickness=2,
     )
+
+
+def normalize_player_name(value, fallback):
+    normalized = " ".join((value or "").strip().split())
+    return normalized[:18] or fallback
+
+
+def replace_player_labels(text, player_names):
+    text = str(text or "")
+    return (
+        text.replace("Oponente 1", player_names[PLAYER_ONE_ID])
+        .replace("Oponente 2", player_names[PLAYER_TWO_ID])
+    )
+
+
+def enrich_duel_labels(duelo, player_names):
+    duelo_local = dict(duelo or {})
+    current_player = duelo_local.get("jogador_atual", "")
+    winner_player = duelo_local.get("vencedor", "")
+
+    duelo_local["jogador_atual_nome"] = player_names.get(
+        current_player, duelo_local.get("jogador_atual_label", "")
+    )
+    duelo_local["vencedor_nome"] = player_names.get(
+        winner_player, duelo_local.get("vencedor_label", "")
+    )
+    duelo_local["feedback"] = replace_player_labels(
+        duelo_local.get("feedback", ""), player_names
+    )
+    duelo_local["mensagem_transicao"] = replace_player_labels(
+        duelo_local.get("mensagem_transicao", ""), player_names
+    )
+    duelo_local["motivo_vitoria"] = replace_player_labels(
+        duelo_local.get("motivo_vitoria", ""), player_names
+    )
+    return duelo_local
+
+
+def collect_player_names():
+    values = {
+        PLAYER_ONE_ID: "",
+        PLAYER_TWO_ID: "",
+    }
+    labels = {
+        PLAYER_ONE_ID: "Jogador 1",
+        PLAYER_TWO_ID: "Jogador 2",
+    }
+    placeholders = {
+        PLAYER_ONE_ID: "Digite o nome do jogador 1",
+        PLAYER_TWO_ID: "Digite o nome do jogador 2",
+    }
+    order = [PLAYER_ONE_ID, PLAYER_TWO_ID]
+    active_index = 0
+
+    cv2.namedWindow(NAME_WINDOW)
+    try:
+        while True:
+            canvas = np.full((520, 940, 3), COLOR_BG, dtype=np.uint8)
+            cv2.rectangle(canvas, (24, 24), (916, 496), (26, 36, 54), -1)
+            cv2.rectangle(canvas, (24, 24), (916, 496), COLOR_BORDER, 2)
+
+            draw_text(canvas, "Registro do Duelo", (60, 88), scale=1.0, thickness=3)
+            draw_text(
+                canvas,
+                "Esses nomes valem apenas para esta abertura do jogo.",
+                (60, 128),
+                scale=0.66,
+                color=COLOR_MUTED,
+            )
+            draw_text(
+                canvas,
+                "ENTER confirma | TAB troca campo | BACKSPACE apaga | ESC cancela",
+                (60, 166),
+                scale=0.52,
+                color=COLOR_TEXT,
+            )
+
+            for index, player_id in enumerate(order):
+                box_y1 = 220 + index * 130
+                box_y2 = box_y1 + 82
+                is_active = index == active_index
+                border = PLAYER_ONE_COLOR if player_id == PLAYER_ONE_ID else PLAYER_TWO_COLOR
+                if not is_active:
+                    border = (90, 110, 145)
+
+                draw_text(
+                    canvas,
+                    labels[player_id],
+                    (60, box_y1 - 18),
+                    scale=0.66,
+                    color=PLAYER_ONE_COLOR if player_id == PLAYER_ONE_ID else PLAYER_TWO_COLOR,
+                    thickness=2,
+                )
+                cv2.rectangle(canvas, (56, box_y1), (884, box_y2), (19, 28, 44), -1)
+                cv2.rectangle(canvas, (56, box_y1), (884, box_y2), border, 2)
+
+                current_text = values[player_id]
+                if current_text:
+                    display = current_text
+                    color = COLOR_TEXT
+                else:
+                    display = placeholders[player_id]
+                    color = (120, 136, 164)
+
+                draw_text(canvas, display, (78, box_y1 + 49), scale=0.72, color=color, thickness=2)
+
+            ready = all(values[player_id].strip() for player_id in order)
+            footer_color = COLOR_SUCCESS if ready else COLOR_WARNING
+            footer_text = "Pressione ENTER para continuar" if ready else "Preencha os dois nomes para continuar"
+            draw_text(canvas, footer_text, (60, 456), scale=0.7, color=footer_color, thickness=2)
+
+            cv2.imshow(NAME_WINDOW, canvas)
+            key = cv2.waitKey(30) & 0xFF
+
+            if key == 27:
+                return None
+            if key == 9:
+                active_index = (active_index + 1) % len(order)
+                continue
+            if key in (10, 13):
+                if ready:
+                    return {
+                        PLAYER_ONE_ID: normalize_player_name(values[PLAYER_ONE_ID], "Jogador 1"),
+                        PLAYER_TWO_ID: normalize_player_name(values[PLAYER_TWO_ID], "Jogador 2"),
+                    }
+                active_index = (active_index + 1) % len(order)
+                continue
+            if key in (8, 127):
+                player_id = order[active_index]
+                values[player_id] = values[player_id][:-1]
+                continue
+            if 32 <= key <= 126:
+                player_id = order[active_index]
+                if len(values[player_id]) < 18:
+                    values[player_id] += chr(key)
+    finally:
+        cv2.destroyWindow(NAME_WINDOW)
 
 
 def draw_lives(canvas, label, current, max_lives, start_x, y, color):
@@ -171,7 +311,7 @@ def draw_header(canvas, duelo, estado):
     )
     draw_text(
         canvas,
-        f"Jogador atual: {duelo.get('jogador_atual_label', '')}",
+        f"Jogador atual: {duelo.get('jogador_atual_nome', duelo.get('jogador_atual_label', ''))}",
         (28, 170),
         scale=0.78,
         color=player_color,
@@ -214,7 +354,7 @@ def draw_right_panel(canvas, duelo, estado):
     draw_card(canvas, (PANEL_X, 136), (card_right, 320), "PLACAR")
     draw_text(
         canvas,
-        "Oponente 1",
+        duelo.get("nome_oponente_1", "Oponente 1"),
         (PANEL_X + 18, 188),
         scale=0.59,
         color=PLAYER_ONE_COLOR,
@@ -241,7 +381,7 @@ def draw_right_panel(canvas, duelo, estado):
 
     draw_text(
         canvas,
-        "Oponente 2",
+        duelo.get("nome_oponente_2", "Oponente 2"),
         (PANEL_X + 18, 250),
         scale=0.59,
         color=PLAYER_TWO_COLOR,
@@ -344,17 +484,17 @@ def draw_phase_overlay(canvas, duelo):
 
     if phase == "aguardando_inicio":
         title = "Rodada pronta"
-        subtitle = "Pressione S para iniciar o tempo do Oponente 1"
+        subtitle = f"Pressione S para iniciar o tempo de {duelo.get('nome_oponente_1', 'Oponente 1')}"
         accent = tuple(duelo.get("jogador_atual_cor_bgr", [255, 255, 255]))
     elif phase == "troca_jogador":
         title = "Troca de jogador"
         subtitle = (
             duelo.get("mensagem_transicao", "")
-            or "Pressione T para iniciar a vez do Oponente 2"
+            or f"Pressione T para iniciar a vez de {duelo.get('nome_oponente_2', 'Oponente 2')}"
         )
         accent = PLAYER_TWO_COLOR
     else:
-        winner = duelo.get("vencedor_label") or "Empate"
+        winner = duelo.get("vencedor_nome") or "Empate"
         title = f"Resultado: {winner}"
         subtitle = duelo.get("motivo_vitoria", "") or "Pressione N para nova palavra"
         accent = COLOR_SUCCESS if duelo.get("vencedor") else COLOR_WARNING
@@ -382,7 +522,7 @@ def draw_phase_overlay(canvas, duelo):
     elif phase == "troca_jogador":
         draw_text(
             canvas,
-            "Pressione T para liberar a vez do Oponente 2",
+            f"Pressione T para liberar a vez de {duelo.get('nome_oponente_2', 'Oponente 2')}",
             (135, 445),
             scale=0.72,
             color=PLAYER_TWO_COLOR,
@@ -391,7 +531,7 @@ def draw_phase_overlay(canvas, duelo):
     else:
         draw_text(
             canvas,
-            "Use a mesma camera e prepare o primeiro jogador",
+            f"Use a mesma camera e prepare {duelo.get('nome_oponente_1', 'Oponente 1')}",
             (135, 445),
             scale=0.72,
             color=COLOR_MUTED,
@@ -412,6 +552,10 @@ async def send_action(websocket, action):
 
 
 async def main():
+    player_names = collect_player_names()
+    if player_names is None:
+        return
+
     camera = cv2.VideoCapture(0, cv2.CAP_DSHOW)
     if not camera.isOpened():
         raise RuntimeError("Erro ao acessar webcam local")
@@ -432,7 +576,9 @@ async def main():
                     )
 
                 estado = response.get("estado", {})
-                duelo = response.get("duelo", {})
+                duelo = enrich_duel_labels(response.get("duelo", {}), player_names)
+                duelo["nome_oponente_1"] = player_names[PLAYER_ONE_ID]
+                duelo["nome_oponente_2"] = player_names[PLAYER_TWO_ID]
                 canvas = draw_panel(frame, duelo, estado)
 
                 cv2.imshow(WINDOW_NAME, canvas)
