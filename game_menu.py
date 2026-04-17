@@ -67,6 +67,18 @@ BUTTONS = [
         "x2": 1100,
         "y2": 640,
     },
+    {
+        "label": "5. Duelo de Tempo",
+        "description": "Competicao local entre dois jogadores em uma mesma camera.",
+        "entry_type": "script",
+        "entry": "websocket_duelo_client.py",
+        "args": [],
+        "requires_server": True,
+        "x1": 620,
+        "y1": 170,
+        "x2": 1100,
+        "y2": 300,
+    },
 ]
 
 selected_script: str | None = None
@@ -112,7 +124,7 @@ def draw_menu() -> np.ndarray:
     cv2.rectangle(canvas, (620, 170), (1210, 470), (28, 36, 52), -1)
 
     cv2.putText(canvas, "Central de Jogos LIBRAS", (70, 80), cv2.FONT_HERSHEY_SIMPLEX, 1.2, (255, 255, 255), 3)
-    cv2.putText(canvas, "Clique em uma opcao ou pressione 1, 2, 3 ou 4.", (70, 115), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (220, 220, 220), 2)
+    cv2.putText(canvas, "Clique em uma opcao ou pressione 1, 2, 3, 4 ou 5.", (70, 115), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (220, 220, 220), 2)
     cv2.putText(canvas, f"Pontos acumulados: {get_points_label()}", (900, 115), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (120, 255, 180), 2)
 
     for button in BUTTONS:
@@ -126,6 +138,7 @@ def draw_menu() -> np.ndarray:
     cv2.putText(canvas, "Palavras: abre o jogo com palavras do CSV.", (650, 330), cv2.FONT_HERSHEY_SIMPLEX, 0.65, (255, 255, 255), 2)
     cv2.putText(canvas, "Imagens de Letras: quiz visual local com vidas.", (650, 370), cv2.FONT_HERSHEY_SIMPLEX, 0.65, (255, 255, 255), 2)
     cv2.putText(canvas, "Loja: compra e equipa looks com os pontos salvos.", (650, 410), cv2.FONT_HERSHEY_SIMPLEX, 0.65, (255, 255, 255), 2)
+    cv2.putText(canvas, "Duelo: base do novo modo 1x1 por tempo na mesma camera.", (650, 250), cv2.FONT_HERSHEY_SIMPLEX, 0.65, (255, 255, 255), 2)
     cv2.putText(canvas, "O servidor WebSocket sobe sozinho quando necessario.", (650, 450), cv2.FONT_HERSHEY_SIMPLEX, 0.62, (190, 230, 255), 2)
     cv2.putText(canvas, "ESC fecha o menu.", (650, 485), cv2.FONT_HERSHEY_SIMPLEX, 0.62, (190, 230, 255), 2)
     return canvas
@@ -158,7 +171,7 @@ def main():
 
         if key == 27:
             break
-        if key in (ord("1"), ord("2"), ord("3"), ord("4")):
+        if key in (ord("1"), ord("2"), ord("3"), ord("4"), ord("5")):
             button = BUTTONS[int(chr(key)) - 1]
             launch_button(button)
 

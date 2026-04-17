@@ -6,6 +6,7 @@ import cv2
 import numpy as np
 from websockets.asyncio.server import serve
 
+from duelo_libras import DueloGameService
 from exercicios_libras import ExerciseGameService
 from hand_tracking_service import HandTrackingService
 
@@ -43,20 +44,22 @@ def build_state_payload(service, maos_detectadas=0, deteccoes=None):
     }
 
 
-def build_result_payload(service, exercise_service=None, maos_detectadas=0, deteccoes=None):
+def build_result_payload(service, exercise_service=None, duel_service=None, maos_detectadas=0, deteccoes=None):
     payload = {
         "tipo": "resultado",
         "estado": build_state_payload(service, maos_detectadas=maos_detectadas, deteccoes=deteccoes),
     }
     if exercise_service is not None:
         payload["exercicio"] = exercise_service.build_state(service.palavra)
+    if duel_service is not None:
+        payload["duelo"] = duel_service.build_state(service.palavra)
     return payload
 
 
 async def handle_connection(websocket):
     path = get_websocket_path(websocket)
 
-    if path not in {"/alfabeto", "/exercicios"}:
+    if path not in {"/alfabeto", "/exercicios", "/duelo"}:
         await websocket.send(
             json.dumps(
                 {
@@ -71,6 +74,7 @@ async def handle_connection(websocket):
 
     service = HandTrackingService()
     exercise_service = ExerciseGameService() if path == "/exercicios" else None
+    duel_service = DueloGameService() if path == "/duelo" else None
     print(f"Cliente conectado em {path}")
 
     try:
@@ -83,37 +87,100 @@ async def handle_connection(websocket):
                     service.confirm_letter()
                     if exercise_service is not None:
                         exercise_service.evaluate_word(service.palavra)
-                    response_payload = build_result_payload(service, exercise_service=exercise_service)
+                    response_payload = build_result_payload(
+                        service,
+                        exercise_service=exercise_service,
+                        duel_service=duel_service,
+                    )
                 elif action == "limpar_palavra":
                     service.clear_word()
                     if exercise_service is not None:
                         exercise_service.completed = False
                         exercise_service.last_feedback = "Palavra limpa. Tente novamente."
-                    response_payload = build_result_payload(service, exercise_service=exercise_service)
+                    response_payload = build_result_payload(
+                        service,
+                        exercise_service=exercise_service,
+                        duel_service=duel_service,
+                    )
                 elif action == "reiniciar_exercicio":
                     service.clear_word()
-                    response_payload = build_result_payload(service, exercise_service=exercise_service)
+                    response_payload = build_result_payload(
+                        service,
+                        exercise_service=exercise_service,
+                        duel_service=duel_service,
+                    )
                     if exercise_service is not None:
                         response_payload["exercicio"] = exercise_service.restart_round()
                 elif action == "proxima_palavra":
                     service.clear_word()
-                    response_payload = build_result_payload(service, exercise_service=exercise_service)
+                    response_payload = build_result_payload(
+                        service,
+                        exercise_service=exercise_service,
+                        duel_service=duel_service,
+                    )
                     if exercise_service is not None:
                         response_payload["exercicio"] = exercise_service.next_word()
+                    if duel_service is not None:
+                        response_payload["duelo"] = duel_service.next_round()
                 elif action == "definir_dificuldade":
                     service.clear_word()
-                    response_payload = build_result_payload(service, exercise_service=exercise_service)
+                    response_payload = build_result_payload(
+                        service,
+                        exercise_service=exercise_service,
+                        duel_service=duel_service,
+                    )
                     if exercise_service is not None:
                         response_payload["exercicio"] = exercise_service.set_difficulty(
                             payload.get("dificuldade", "")
                         )
                 elif action == "definir_modo_jogo":
                     service.clear_word()
-                    response_payload = build_result_payload(service, exercise_service=exercise_service)
+                    response_payload = build_result_payload(
+                        service,
+                        exercise_service=exercise_service,
+                        duel_service=duel_service,
+                    )
                     if exercise_service is not None:
                         response_payload["exercicio"] = exercise_service.set_game_mode(
                             payload.get("modo_jogo", "")
                         )
+                elif action == "iniciar_duelo":
+                    service.clear_word()
+                    response_payload = build_result_payload(
+                        service,
+                        exercise_service=exercise_service,
+                        duel_service=duel_service,
+                    )
+                    if duel_service is not None:
+                        response_payload["duelo"] = duel_service.start_round()
+                elif action == "validar_palavra_duelo":
+                    response_payload = build_result_payload(
+                        service,
+                        exercise_service=exercise_service,
+                        duel_service=duel_service,
+                    )
+                    if duel_service is not None:
+                        response_payload["duelo"] = duel_service.evaluate_attempt(service.palavra)
+                        if response_payload["duelo"].get("fase") in {"troca_jogador", "resultado"}:
+                            service.clear_word()
+                elif action == "trocar_jogador_duelo":
+                    service.clear_word()
+                    response_payload = build_result_payload(
+                        service,
+                        exercise_service=exercise_service,
+                        duel_service=duel_service,
+                    )
+                    if duel_service is not None:
+                        response_payload["duelo"] = duel_service.continue_to_next_player()
+                elif action == "reiniciar_duelo":
+                    service.clear_word()
+                    response_payload = build_result_payload(
+                        service,
+                        exercise_service=exercise_service,
+                        duel_service=duel_service,
+                    )
+                    if duel_service is not None:
+                        response_payload["duelo"] = duel_service.reset_match()
                 else:
                     frame_base64 = payload["frame"]
                     frame = decode_frame(frame_base64)
@@ -121,6 +188,7 @@ async def handle_connection(websocket):
                     response_payload = build_result_payload(
                         service,
                         exercise_service=exercise_service,
+                        duel_service=duel_service,
                         maos_detectadas=state.get("maos_detectadas", 0),
                         deteccoes=state.get("deteccoes", []),
                     )
@@ -144,7 +212,7 @@ async def handle_connection(websocket):
 async def main():
     async with serve(handle_connection, HOST, PORT, max_size=2**22):
         print(f"WebSocket ativo em ws://{HOST}:{PORT}")
-        print("Rotas disponiveis: ws://127.0.0.1:8765/alfabeto, ws://127.0.0.1:8765/exercicios")
+        print("Rotas disponiveis: ws://127.0.0.1:8765/alfabeto, ws://127.0.0.1:8765/exercicios, ws://127.0.0.1:8765/duelo")
         await asyncio.Future()
 
 
