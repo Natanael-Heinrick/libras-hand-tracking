@@ -13,19 +13,39 @@ NAME_WINDOW = "Registro dos Jogadores"
 FRAME_WIDTH = 1460
 FRAME_HEIGHT = 720
 CAMERA_WIDTH = 820
-PANEL_X = 850
-PANEL_WIDTH = 580
-COLOR_BG = (20, 26, 38)
-COLOR_PANEL = (28, 37, 54)
-COLOR_BORDER = (105, 160, 235)
-COLOR_TEXT = (245, 248, 255)
-COLOR_MUTED = (184, 198, 220)
-COLOR_ACCENT = (96, 224, 255)
-COLOR_SUCCESS = (145, 235, 165)
-COLOR_WARNING = (130, 190, 255)
-COLOR_DANGER = (160, 180, 255)
-PLAYER_ONE_COLOR = (255, 120, 0)
-PLAYER_TWO_COLOR = (0, 140, 255)
+PANEL_X = 846
+PANEL_WIDTH = 586
+SKY_HEIGHT = 470
+
+COLOR_SKY_TOP = (255, 178, 78)
+COLOR_SKY_BOTTOM = (237, 226, 150)
+COLOR_CLOUD = (246, 246, 255)
+COLOR_CLOUD_SHADOW = (214, 224, 244)
+COLOR_HILL = (62, 120, 62)
+COLOR_GRASS = (68, 146, 78)
+COLOR_GRASS_TOP = (96, 190, 92)
+COLOR_GRASS_SHADOW = (56, 108, 50)
+COLOR_WOOD_DARK = (102, 70, 40)
+COLOR_WOOD = (132, 93, 55)
+COLOR_WOOD_LIGHT = (160, 118, 72)
+COLOR_WOOD_SOFT = (178, 138, 92)
+COLOR_BORDER = (252, 232, 150)
+COLOR_BORDER_SOFT = (255, 245, 170)
+COLOR_TEXT = (255, 255, 255)
+COLOR_TEXT_SOFT = (246, 238, 224)
+COLOR_MUTED = (236, 228, 210)
+COLOR_ACCENT = (104, 216, 250)
+COLOR_ACCENT_BORDER = (142, 190, 240)
+COLOR_SUCCESS = (164, 238, 142)
+COLOR_WARNING = (255, 240, 160)
+COLOR_STATUS_BG = (44, 84, 62)
+COLOR_CONTROLS = (88, 78, 52)
+COLOR_CAMERA_BANNER = (66, 104, 150)
+COLOR_CAMERA_BANNER_BORDER = (171, 206, 255)
+PLAYER_ONE_COLOR = (255, 200, 120)
+PLAYER_TWO_COLOR = (140, 220, 255)
+PLAYER_ONE_FILL = (166, 108, 58)
+PLAYER_TWO_FILL = (72, 114, 160)
 PLAYER_ONE_ID = "oponente_1"
 PLAYER_TWO_ID = "oponente_2"
 
@@ -35,7 +55,7 @@ def draw_text(canvas, text, position, scale=0.8, color=COLOR_TEXT, thickness=2):
         canvas,
         str(text),
         position,
-        cv2.FONT_HERSHEY_SIMPLEX,
+        cv2.FONT_HERSHEY_DUPLEX,
         scale,
         color,
         thickness,
@@ -48,7 +68,7 @@ def draw_text_right(
 ):
     text = str(text)
     (text_width, _), _ = cv2.getTextSize(
-        text, cv2.FONT_HERSHEY_SIMPLEX, scale, thickness
+        text, cv2.FONT_HERSHEY_DUPLEX, scale, thickness
     )
     draw_text(
         canvas,
@@ -60,19 +80,82 @@ def draw_text_right(
     )
 
 
-def draw_card(canvas, top_left, bottom_right, title, border_color=COLOR_BORDER):
+def draw_panel(
+    canvas,
+    top_left,
+    bottom_right,
+    fill_color,
+    border_color,
+    border_thickness=3,
+    shadow=True,
+):
     x1, y1 = top_left
     x2, y2 = bottom_right
-    cv2.rectangle(canvas, (x1, y1), (x2, y2), COLOR_PANEL, -1)
-    cv2.rectangle(canvas, (x1, y1), (x2, y2), border_color, 2)
-    draw_text(
-        canvas,
-        title,
-        (x1 + 18, y1 + 32),
-        scale=0.58,
-        color=(230, 236, 255),
-        thickness=2,
-    )
+    if shadow:
+        cv2.rectangle(canvas, (x1 + 6, y1 + 6), (x2 + 6, y2 + 6), COLOR_WOOD_DARK, -1)
+    cv2.rectangle(canvas, (x1, y1), (x2, y2), fill_color, -1)
+    cv2.rectangle(canvas, (x1, y1), (x2, y2), border_color, border_thickness)
+
+
+def draw_card(canvas, top_left, bottom_right, title, fill_color=COLOR_WOOD, border_color=COLOR_BORDER, title_color=COLOR_TEXT):
+    draw_panel(canvas, top_left, bottom_right, fill_color, border_color, 3)
+    if title:
+        draw_text(
+            canvas,
+            title,
+            (top_left[0] + 18, top_left[1] + 30),
+            scale=0.56,
+            color=title_color,
+            thickness=2,
+        )
+
+
+def draw_badge(canvas, x, y, text, fill_color, text_color=COLOR_TEXT):
+    (text_width, _), _ = cv2.getTextSize(text, cv2.FONT_HERSHEY_DUPLEX, 0.46, 1)
+    width = text_width + 24
+    cv2.rectangle(canvas, (x, y), (x + width, y + 28), fill_color, -1)
+    cv2.rectangle(canvas, (x, y), (x + width, y + 28), COLOR_BORDER_SOFT, 2)
+    draw_text(canvas, text, (x + 12, y + 20), 0.46, text_color, 1)
+    return width
+
+
+def draw_pixel_cloud(canvas, x, y, size):
+    blocks = [
+        (0, 1), (1, 0), (1, 1), (2, 0), (2, 1), (3, 1), (4, 1),
+        (1, 2), (2, 2), (3, 2),
+    ]
+    for col, row in blocks:
+        x1 = x + col * size
+        y1 = y + row * size
+        cv2.rectangle(canvas, (x1, y1), (x1 + size, y1 + size), COLOR_CLOUD, -1)
+        cv2.rectangle(canvas, (x1, y1 + size - 4), (x1 + size, y1 + size), COLOR_CLOUD_SHADOW, -1)
+
+
+def draw_pixel_background(canvas, width, height, sky_height):
+    for y in range(height):
+        ratio = min(1.0, y / max(1, sky_height))
+        color = (
+            int(COLOR_SKY_TOP[0] + (COLOR_SKY_BOTTOM[0] - COLOR_SKY_TOP[0]) * ratio),
+            int(COLOR_SKY_TOP[1] + (COLOR_SKY_BOTTOM[1] - COLOR_SKY_TOP[1]) * ratio),
+            int(COLOR_SKY_TOP[2] + (COLOR_SKY_BOTTOM[2] - COLOR_SKY_TOP[2]) * ratio),
+        )
+        cv2.line(canvas, (0, y), (width, y), color, 1)
+
+    draw_pixel_cloud(canvas, 90, 50, 16)
+    draw_pixel_cloud(canvas, 500, 40, 12)
+    draw_pixel_cloud(canvas, 1100, 72, 14)
+
+    cv2.circle(canvas, (120, sky_height + 40), 120, COLOR_HILL, -1)
+    cv2.circle(canvas, (420, sky_height + 54), 164, COLOR_HILL, -1)
+    cv2.circle(canvas, (1040, sky_height + 48), 150, COLOR_HILL, -1)
+
+    cv2.rectangle(canvas, (0, sky_height), (width, height), COLOR_GRASS, -1)
+    cv2.rectangle(canvas, (0, sky_height), (width, sky_height + 14), COLOR_GRASS_TOP, -1)
+    cv2.rectangle(canvas, (0, sky_height + 14), (width, sky_height + 30), COLOR_GRASS_SHADOW, -1)
+
+    for x in range(0, width, 40):
+        cv2.rectangle(canvas, (x, height - 18), (x + 20, height), COLOR_CONTROLS, -1)
+    cv2.rectangle(canvas, (0, height - 18), (width, height), COLOR_WOOD, 2)
 
 
 def normalize_player_name(value, fallback):
@@ -130,44 +213,53 @@ def collect_player_names():
     cv2.namedWindow(NAME_WINDOW)
     try:
         while True:
-            canvas = np.full((520, 940, 3), COLOR_BG, dtype=np.uint8)
-            cv2.rectangle(canvas, (24, 24), (916, 496), (26, 36, 54), -1)
-            cv2.rectangle(canvas, (24, 24), (916, 496), COLOR_BORDER, 2)
+            canvas = np.zeros((560, 960, 3), dtype=np.uint8)
+            draw_pixel_background(canvas, 960, 560, 360)
 
-            draw_text(canvas, "Registro do Duelo", (60, 88), scale=1.0, thickness=3)
+            draw_panel(canvas, (184, 26), (776, 94), COLOR_CAMERA_BANNER, COLOR_BORDER, 4)
+            draw_text(canvas, "REGISTRO DO DUELO", (258, 68), scale=1.0, color=COLOR_TEXT, thickness=3)
             draw_text(
                 canvas,
-                "Esses nomes valem apenas para esta abertura do jogo.",
-                (60, 128),
-                scale=0.66,
-                color=COLOR_MUTED,
+                "Prepare os dois jogadores para a partida.",
+                (282, 90),
+                scale=0.46,
+                color=COLOR_TEXT_SOFT,
+                thickness=1,
             )
+
+            draw_panel(canvas, (88, 134), (872, 432), COLOR_WOOD, COLOR_BORDER_SOFT, 4)
             draw_text(
                 canvas,
-                "ENTER confirma | TAB troca campo | BACKSPACE apaga | ESC cancela",
-                (60, 166),
-                scale=0.52,
-                color=COLOR_TEXT,
+                "Esses nomes valem apenas para esta abertura do duelo.",
+                (122, 170),
+                scale=0.54,
+                color=COLOR_TEXT_SOFT,
+                thickness=1,
             )
 
             for index, player_id in enumerate(order):
-                box_y1 = 220 + index * 130
-                box_y2 = box_y1 + 82
+                box_y1 = 206 + index * 106
+                box_y2 = box_y1 + 66
                 is_active = index == active_index
-                border = PLAYER_ONE_COLOR if player_id == PLAYER_ONE_ID else PLAYER_TWO_COLOR
-                if not is_active:
-                    border = (90, 110, 145)
+                label_color = PLAYER_ONE_COLOR if player_id == PLAYER_ONE_ID else PLAYER_TWO_COLOR
+                fill = PLAYER_ONE_FILL if player_id == PLAYER_ONE_ID else PLAYER_TWO_FILL
+                border = COLOR_WARNING if is_active else COLOR_BORDER_SOFT
+                shadow_fill = COLOR_WOOD_DARK if is_active else COLOR_WOOD
 
                 draw_text(
                     canvas,
                     labels[player_id],
-                    (60, box_y1 - 18),
-                    scale=0.66,
-                    color=PLAYER_ONE_COLOR if player_id == PLAYER_ONE_ID else PLAYER_TWO_COLOR,
+                    (126, box_y1 - 12),
+                    scale=0.6,
+                    color=label_color,
                     thickness=2,
                 )
-                cv2.rectangle(canvas, (56, box_y1), (884, box_y2), (19, 28, 44), -1)
-                cv2.rectangle(canvas, (56, box_y1), (884, box_y2), border, 2)
+                cv2.rectangle(canvas, (112, box_y1 + 6), (852, box_y2 + 6), shadow_fill, -1)
+                draw_panel(canvas, (108, box_y1), (848, box_y2), fill, border, 3, shadow=False)
+                if is_active:
+                    cv2.rectangle(canvas, (92, box_y1 + 16), (104, box_y1 + 30), COLOR_WARNING, -1)
+                    cv2.rectangle(canvas, (852, box_y1 + 16), (864, box_y1 + 30), COLOR_WARNING, -1)
+                    cv2.rectangle(canvas, (108, box_y1), (848, box_y2), COLOR_BORDER, 1)
 
                 current_text = values[player_id]
                 if current_text:
@@ -175,14 +267,27 @@ def collect_player_names():
                     color = COLOR_TEXT
                 else:
                     display = placeholders[player_id]
-                    color = (120, 136, 164)
+                    color = COLOR_TEXT_SOFT
 
-                draw_text(canvas, display, (78, box_y1 + 49), scale=0.72, color=color, thickness=2)
+                draw_text(canvas, display, (132, box_y1 + 41), scale=0.64, color=color, thickness=2)
 
             ready = all(values[player_id].strip() for player_id in order)
-            footer_color = COLOR_SUCCESS if ready else COLOR_WARNING
-            footer_text = "Pressione ENTER para continuar" if ready else "Preencha os dois nomes para continuar"
-            draw_text(canvas, footer_text, (60, 456), scale=0.7, color=footer_color, thickness=2)
+            status_fill = COLOR_STATUS_BG if ready else COLOR_WOOD_SOFT
+            status_border = COLOR_SUCCESS if ready else COLOR_WARNING
+            status_text = "Pressione ENTER para continuar" if ready else "Preencha os dois nomes para continuar"
+            draw_panel(canvas, (118, 374), (842, 414), status_fill, status_border, 3)
+            draw_text(canvas, status_text, (148, 401), scale=0.56, color=COLOR_TEXT, thickness=2)
+
+            cv2.rectangle(canvas, (104, 462), (856, 504), COLOR_CONTROLS, -1)
+            cv2.rectangle(canvas, (104, 462), (856, 504), COLOR_BORDER_SOFT, 3)
+            draw_text(
+                canvas,
+                "[ENTER] Confirmar   [TAB] Trocar campo   [BACKSPACE] Apagar   [ESC] Cancelar",
+                (124, 489),
+                scale=0.4,
+                color=COLOR_TEXT,
+                thickness=1,
+            )
 
             cv2.imshow(NAME_WINDOW, canvas)
             key = cv2.waitKey(30) & 0xFF
@@ -212,14 +317,15 @@ def collect_player_names():
         cv2.destroyWindow(NAME_WINDOW)
 
 
-def draw_lives(canvas, label, current, max_lives, start_x, y, color):
-    draw_text(canvas, label, (start_x, y), scale=0.62, color=color, thickness=2)
-    x = start_x + 72
+def draw_lives(canvas, current, max_lives, start_x, y, color):
+    x = start_x
     for index in range(max_lives):
         filled = index < current
-        fill_color = color if filled else (80, 90, 110)
-        cv2.circle(canvas, (x + 10, y - 8), 9, fill_color, -1)
-        cv2.circle(canvas, (x + 10, y - 8), 9, (235, 240, 248), 1)
+        fill_color = color if filled else COLOR_WOOD_DARK
+        cv2.circle(canvas, (x + 10, y), 11, fill_color, -1)
+        cv2.circle(canvas, (x + 10, y), 11, COLOR_BORDER_SOFT, 1)
+        if filled:
+            cv2.circle(canvas, (x + 7, y - 3), 3, COLOR_BORDER_SOFT, -1)
         x += 30
 
 
@@ -266,215 +372,130 @@ def get_phase_label(phase):
 
 
 def create_layout(frame):
-    resized = cv2.resize(frame, (CAMERA_WIDTH, FRAME_HEIGHT))
-    canvas = np.full((FRAME_HEIGHT, FRAME_WIDTH, 3), COLOR_BG, dtype=np.uint8)
-    canvas[:, :CAMERA_WIDTH] = resized
+    canvas = np.zeros((FRAME_HEIGHT, FRAME_WIDTH, 3), dtype=np.uint8)
+    draw_pixel_background(canvas, FRAME_WIDTH, FRAME_HEIGHT, SKY_HEIGHT)
 
-    # Gradient overlay over the camera view for readability.
+    resized = cv2.resize(frame, (CAMERA_WIDTH, FRAME_HEIGHT - 36))
+    camera_x1 = 18
+    camera_y1 = 18
+    camera_x2 = camera_x1 + CAMERA_WIDTH
+    camera_y2 = camera_y1 + resized.shape[0]
+
+    draw_panel(canvas, (camera_x1, camera_y1), (camera_x2, camera_y2), COLOR_BORDER_SOFT, COLOR_BORDER_SOFT, 4)
+    canvas[camera_y1:camera_y2, camera_x1:camera_x2] = resized
+
     overlay = canvas.copy()
-    cv2.rectangle(overlay, (0, 0), (CAMERA_WIDTH, 120), (12, 18, 30), -1)
-    cv2.rectangle(
-        overlay, (0, FRAME_HEIGHT - 140), (CAMERA_WIDTH, FRAME_HEIGHT), (12, 18, 30), -1
-    )
-    cv2.addWeighted(overlay, 0.25, canvas, 0.75, 0, canvas)
+    cv2.rectangle(overlay, (camera_x1, camera_y1), (camera_x2, camera_y1 + 134), (170, 212, 255), -1)
+    cv2.rectangle(overlay, (camera_x1, camera_y2 - 144), (camera_x2, camera_y2), (116, 180, 255), -1)
+    cv2.addWeighted(overlay, 0.2, canvas, 0.8, 0, canvas)
+    cv2.rectangle(canvas, (camera_x1, camera_y1), (camera_x2, camera_y2), COLOR_BORDER_SOFT, 4)
 
-    cv2.rectangle(
-        canvas, (CAMERA_WIDTH, 0), (FRAME_WIDTH, FRAME_HEIGHT), (16, 22, 34), -1
-    )
-    cv2.rectangle(
-        canvas,
-        (CAMERA_WIDTH + 6, 14),
-        (FRAME_WIDTH - 14, FRAME_HEIGHT - 14),
-        (40, 56, 84),
-        2,
-    )
+    draw_panel(canvas, (42, 26), (414, 110), COLOR_CAMERA_BANNER, COLOR_CAMERA_BANNER_BORDER, 3)
+    draw_panel(canvas, (PANEL_X, 26), (PANEL_X + PANEL_WIDTH, 702), COLOR_WOOD, COLOR_BORDER, 4)
     return canvas
 
 
 def draw_header(canvas, duelo, estado):
     player_color = tuple(duelo.get("jogador_atual_cor_bgr", [255, 255, 255]))
-    draw_text(canvas, "Duelo de Tempo LIBRAS", (28, 54), scale=1.0, thickness=3)
+    draw_text(canvas, "DUELO DE TEMPO LIBRAS", (62, 64), scale=0.92, color=COLOR_TEXT, thickness=3)
+    draw_text(canvas, duelo.get("jogador_atual_nome", ""), (62, 94), scale=0.52, color=COLOR_WARNING, thickness=2)
+
+    draw_text(canvas, "Palavra alvo", (38, 148), scale=0.54, color=COLOR_MUTED, thickness=1)
     draw_text(
         canvas,
-        f"Palavra alvo: {duelo.get('palavra_alvo', '')}",
-        (28, 95),
-        scale=0.82,
-        color=COLOR_ACCENT,
-    )
-    draw_text(
-        canvas,
-        f"Sua palavra: {estado.get('palavra', '') or '_'}",
-        (28, 132),
-        scale=0.88,
-        color=(255, 240, 120),
-        thickness=2,
-    )
-    draw_text(
-        canvas,
-        f"Jogador atual: {duelo.get('jogador_atual_nome', duelo.get('jogador_atual_label', ''))}",
-        (28, 170),
-        scale=0.78,
-        color=player_color,
+        duelo.get("palavra_alvo", "--"),
+        (38, 192),
+        scale=1.08,
+        color=COLOR_WARNING,
         thickness=3,
+    )
+    draw_text(canvas, "Sua palavra", (38, 236), scale=0.54, color=COLOR_MUTED, thickness=1)
+    draw_text(
+        canvas,
+        estado.get("palavra", "") or "_",
+        (38, 278),
+        scale=0.96,
+        color=COLOR_TEXT,
+        thickness=3,
+    )
+    draw_text(canvas, "Jogador atual", (38, 322), scale=0.54, color=COLOR_MUTED, thickness=1)
+    draw_badge(
+        canvas,
+        38,
+        336,
+        duelo.get("jogador_atual_nome", duelo.get("jogador_atual_label", "")),
+        COLOR_CAMERA_BANNER,
+        player_color,
     )
 
 
 def draw_right_panel(canvas, duelo, estado):
     phase = duelo.get("fase", "")
     player_color = tuple(duelo.get("jogador_atual_cor_bgr", [255, 255, 255]))
-    card_right = PANEL_X + PANEL_WIDTH
-    inner_mid = PANEL_X + 300
+    card_right = PANEL_X + PANEL_WIDTH - 18
 
-    draw_card(
+    draw_card(canvas, (PANEL_X + 18, 46), (card_right, 140), "STATUS DA RODADA", fill_color=COLOR_WOOD_LIGHT, border_color=player_color, title_color=COLOR_TEXT)
+    draw_text(canvas, get_phase_label(phase), (PANEL_X + 40, 96), scale=0.66, color=player_color, thickness=2)
+    draw_badge(
         canvas,
-        (PANEL_X, 26),
-        (card_right, 116),
-        "STATUS DA RODADA",
-        border_color=player_color,
-    )
-    draw_text(
-        canvas, "-", (PANEL_X + 250, 32), scale=0.58, color=(230, 236, 255), thickness=2
-    )
-    draw_text(
-        canvas,
-        get_phase_label(phase),
-        (PANEL_X + 270, 32),
-        scale=0.54,
-        color=player_color,
-        thickness=2,
-    )
-    draw_text(
-        canvas,
-        f"Letra atual: {estado.get('letra_estavel') or estado.get('letra') or '--'}",
-        (PANEL_X + 18, 96),
-        scale=0.58,
-        color=COLOR_SUCCESS,
+        PANEL_X + 40,
+        106,
+        f"Letra {estado.get('letra_estavel') or estado.get('letra') or '--'}",
+        COLOR_STATUS_BG,
+        COLOR_TEXT,
     )
 
-    draw_card(canvas, (PANEL_X, 136), (card_right, 320), "PLACAR")
-    draw_text(
-        canvas,
-        duelo.get("nome_oponente_1", "Oponente 1"),
-        (PANEL_X + 18, 188),
-        scale=0.59,
-        color=PLAYER_ONE_COLOR,
-        thickness=2,
-    )
-    draw_text_right(
-        canvas,
-        fmt_time(duelo.get("tempo_oponente_1")),
-        inner_mid,
-        188,
-        scale=0.72,
-        color=PLAYER_ONE_COLOR,
-        thickness=2,
-    )
-    draw_lives(
-        canvas,
-        "Vidas",
-        duelo.get("vidas_oponente_1", 0),
-        duelo.get("vidas_maximas", 0),
-        PANEL_X + 18,
-        206,
-        PLAYER_ONE_COLOR,
-    )
+    draw_card(canvas, (PANEL_X + 18, 154), (card_right, 338), "PLACAR", fill_color=COLOR_WOOD_SOFT, border_color=COLOR_BORDER_SOFT)
+    player_one_active = duelo.get("jogador_atual") == PLAYER_ONE_ID
+    player_two_active = duelo.get("jogador_atual") == PLAYER_TWO_ID
 
-    draw_text(
+    draw_panel(
         canvas,
-        duelo.get("nome_oponente_2", "Oponente 2"),
-        (PANEL_X + 18, 250),
-        scale=0.59,
-        color=PLAYER_TWO_COLOR,
-        thickness=2,
+        (PANEL_X + 34, 192),
+        (card_right - 16, 250),
+        PLAYER_ONE_FILL if player_one_active else COLOR_WOOD_LIGHT,
+        COLOR_WARNING if player_one_active else COLOR_BORDER_SOFT,
+        2,
     )
-    draw_text_right(
-        canvas,
-        fmt_time(duelo.get("tempo_oponente_2")),
-        inner_mid,
-        250,
-        scale=0.72,
-        color=PLAYER_TWO_COLOR,
-        thickness=2,
-    )
-    draw_lives(
-        canvas,
-        "Vidas",
-        duelo.get("vidas_oponente_2", 0),
-        duelo.get("vidas_maximas", 0),
-        PANEL_X + 18,
-        280,
-        PLAYER_TWO_COLOR,
-    )
+    draw_text(canvas, duelo.get("nome_oponente_1", "Oponente 1"), (PANEL_X + 52, 226), scale=0.58, color=PLAYER_ONE_COLOR, thickness=2)
+    draw_text_right(canvas, fmt_time(duelo.get("tempo_oponente_1")), card_right - 36, 226, scale=0.64, color=COLOR_TEXT, thickness=2)
+    draw_lives(canvas, duelo.get("vidas_oponente_1", 0), duelo.get("vidas_maximas", 0), PANEL_X + 50, 242, PLAYER_ONE_COLOR)
+    if player_one_active:
+        draw_badge(canvas, card_right - 126, 202, "VEZ", COLOR_STATUS_BG, COLOR_TEXT)
 
-    draw_card(canvas, (PANEL_X, 306), (card_right, 430), "CRONOMETRO")
-    draw_text(canvas, "Tempo atual", (PANEL_X + 18, 362), scale=0.54, color=COLOR_MUTED)
-    draw_text(
+    draw_panel(
         canvas,
-        fmt_time(duelo.get("tempo_atual")),
-        (PANEL_X + 18, 399),
-        scale=1.0,
-        color=COLOR_TEXT,
-        thickness=3,
+        (PANEL_X + 34, 266),
+        (card_right - 16, 324),
+        PLAYER_TWO_FILL if player_two_active else COLOR_WOOD_LIGHT,
+        COLOR_WARNING if player_two_active else COLOR_BORDER_SOFT,
+        2,
     )
-    draw_text(
-        canvas, "Tempo a bater", (inner_mid + 20, 362), scale=0.54, color=COLOR_MUTED
-    )
-    draw_text(
-        canvas,
-        fmt_time(duelo.get("tempo_a_bater")),
-        (inner_mid + 20, 399),
-        scale=0.86,
-        color=COLOR_WARNING,
-        thickness=2,
-    )
+    draw_text(canvas, duelo.get("nome_oponente_2", "Oponente 2"), (PANEL_X + 52, 300), scale=0.58, color=PLAYER_TWO_COLOR, thickness=2)
+    draw_text_right(canvas, fmt_time(duelo.get("tempo_oponente_2")), card_right - 36, 290, scale=0.64, color=COLOR_TEXT, thickness=2)
+    draw_lives(canvas, duelo.get("vidas_oponente_2", 0), duelo.get("vidas_maximas", 0), PANEL_X + 50, 316, PLAYER_TWO_COLOR)
+    if player_two_active:
+        draw_badge(canvas, card_right - 126, 276, "VEZ", COLOR_STATUS_BG, COLOR_TEXT)
 
-    draw_card(canvas, (PANEL_X, 450), (card_right, 620), "MENSAGENS")
+    draw_card(canvas, (PANEL_X + 18, 360), (card_right, 486), "CRONOMETRO", fill_color=COLOR_WOOD_LIGHT, border_color=COLOR_BORDER_SOFT)
+    draw_text(canvas, "Tempo atual", (PANEL_X + 40, 402), scale=0.5, color=COLOR_MUTED, thickness=1)
+    draw_text(canvas, fmt_time(duelo.get("tempo_atual")), (PANEL_X + 40, 454), scale=1.18, color=COLOR_WARNING, thickness=3)
+    draw_text(canvas, "Tempo a bater", (PANEL_X + 328, 404), scale=0.48, color=COLOR_MUTED, thickness=1)
+    draw_text(canvas, fmt_time(duelo.get("tempo_a_bater")), (PANEL_X + 328, 442), scale=0.72, color=COLOR_ACCENT, thickness=2)
+
+    draw_card(canvas, (PANEL_X + 18, 506), (card_right, 620), "MENSAGENS", fill_color=COLOR_WOOD_SOFT, border_color=COLOR_BORDER_SOFT)
     feedback_lines = wrap_text(duelo.get("feedback", ""), max_chars=37)
-    for index, line in enumerate(feedback_lines[:3]):
-        draw_text(
-            canvas,
-            line,
-            (PANEL_X + 18, 522 + index * 28),
-            scale=0.58,
-            color=COLOR_SUCCESS,
-        )
+    for index, line in enumerate(feedback_lines[:2]):
+        draw_text(canvas, line, (PANEL_X + 40, 554 + index * 28), scale=0.54, color=COLOR_SUCCESS, thickness=2)
 
-    transition_lines = wrap_text(duelo.get("mensagem_transicao", ""), max_chars=44)
-    for index, line in enumerate(transition_lines[:3]):
-        draw_text(
-            canvas,
-            line,
-            (PANEL_X + 18, 592 + index * 18),
-            scale=0.50,
-            color=(255, 220, 170),
-        )
+    transition_lines = wrap_text(duelo.get("mensagem_transicao", ""), max_chars=40)
+    for index, line in enumerate(transition_lines[:2]):
+        draw_text(canvas, line, (PANEL_X + 40, 602 + index * 20), scale=0.46, color=COLOR_TEXT_SOFT, thickness=1)
 
-    draw_card(canvas, (PANEL_X, 640), (card_right, 704), "")
-    draw_text(
-        canvas,
-        "S inicia | ESPACO confirma | ENTER valida",
-        (PANEL_X + 18, 678),
-        scale=0.44,
-        color=COLOR_TEXT,
-    )
-    draw_text(
-        canvas,
-        "T troca | N nova palavra | R reinicia | C limpa",
-        (PANEL_X + 18, 698),
-        scale=0.44,
-        color=COLOR_TEXT,
-    )
-
-    csv_lines = wrap_text(f"CSV: {duelo.get('fonte_dados', '')}", max_chars=58)
-    for index, line in enumerate(csv_lines[:2]):
-        draw_text(
-            canvas,
-            line,
-            (PANEL_X, 714 + index * 18),
-            scale=0.42,
-            color=(150, 170, 205),
-            thickness=1,
-        )
+    cv2.rectangle(canvas, (PANEL_X + 18, 640), (card_right, 696), COLOR_CONTROLS, -1)
+    cv2.rectangle(canvas, (PANEL_X + 18, 640), (card_right, 696), COLOR_BORDER_SOFT, 3)
+    draw_text(canvas, "[S] Iniciar | [ESPACO] Confirmar | [ENTER] Validar", (PANEL_X + 30, 664), scale=0.39, color=COLOR_TEXT, thickness=1)
+    draw_text(canvas, "[T] Trocar | [N] Nova palavra | [R] Reiniciar | [C] Limpar", (PANEL_X + 30, 686), scale=0.37, color=COLOR_TEXT_SOFT, thickness=1)
 
 
 def draw_phase_overlay(canvas, duelo):
@@ -484,7 +505,7 @@ def draw_phase_overlay(canvas, duelo):
 
     if phase == "aguardando_inicio":
         title = "Rodada pronta"
-        subtitle = f"Pressione S para iniciar o tempo de {duelo.get('nome_oponente_1', 'Oponente 1')}"
+        subtitle = f"Pressione S para iniciar a vez de {duelo.get('nome_oponente_1', 'Oponente 1')}"
         accent = tuple(duelo.get("jogador_atual_cor_bgr", [255, 255, 255]))
     elif phase == "troca_jogador":
         title = "Troca de jogador"
@@ -500,45 +521,47 @@ def draw_phase_overlay(canvas, duelo):
         accent = COLOR_SUCCESS if duelo.get("vencedor") else COLOR_WARNING
 
     overlay = canvas.copy()
-    cv2.rectangle(overlay, (100, 180), (730, 520), (10, 14, 24), -1)
-    cv2.addWeighted(overlay, 0.7, canvas, 0.3, 0, canvas)
-    cv2.rectangle(canvas, (100, 180), (730, 520), accent, 3)
-    draw_text(canvas, title, (135, 255), scale=1.2, color=accent, thickness=3)
+    cv2.rectangle(overlay, (194, 218), (662, 452), (226, 235, 246), -1)
+    cv2.addWeighted(overlay, 0.14, canvas, 0.86, 0, canvas)
 
-    y = 320
+    draw_panel(canvas, (204, 228), (652, 442), COLOR_WOOD, COLOR_BORDER_SOFT, 4)
+    draw_text(canvas, title, (234, 280), scale=0.96, color=accent, thickness=3)
+
+    y = 330
     for line in wrap_text(subtitle, max_chars=34)[:3]:
-        draw_text(canvas, line, (135, y), scale=0.76, color=COLOR_TEXT)
-        y += 40
+        draw_text(canvas, line, (234, y), scale=0.62, color=COLOR_TEXT, thickness=2)
+        y += 34
 
     if phase == "resultado":
         draw_text(
             canvas,
-            f"O1: {fmt_time(duelo.get('tempo_oponente_1'))}   O2: {fmt_time(duelo.get('tempo_oponente_2'))}",
-            (135, 445),
-            scale=0.8,
+            f"O1 {fmt_time(duelo.get('tempo_oponente_1'))}   O2 {fmt_time(duelo.get('tempo_oponente_2'))}",
+            (234, 404),
+            scale=0.68,
             color=COLOR_ACCENT,
             thickness=2,
         )
     elif phase == "troca_jogador":
         draw_text(
             canvas,
-            f"Pressione T para liberar a vez de {duelo.get('nome_oponente_2', 'Oponente 2')}",
-            (135, 445),
-            scale=0.72,
+            f"Prepare {duelo.get('nome_oponente_2', 'Oponente 2')} para continuar.",
+            (234, 404),
+            scale=0.56,
             color=PLAYER_TWO_COLOR,
             thickness=2,
         )
     else:
         draw_text(
             canvas,
-            f"Use a mesma camera e prepare {duelo.get('nome_oponente_1', 'Oponente 1')}",
-            (135, 445),
-            scale=0.72,
-            color=COLOR_MUTED,
+            f"Prepare {duelo.get('nome_oponente_1', 'Oponente 1')} na mesma camera.",
+            (234, 404),
+            scale=0.56,
+            color=COLOR_TEXT_SOFT,
+            thickness=1,
         )
 
 
-def draw_panel(frame, duelo, estado):
+def draw_panel_main(frame, duelo, estado):
     canvas = create_layout(frame)
     draw_header(canvas, duelo, estado)
     draw_right_panel(canvas, duelo, estado)
@@ -579,7 +602,7 @@ async def main():
                 duelo = enrich_duel_labels(response.get("duelo", {}), player_names)
                 duelo["nome_oponente_1"] = player_names[PLAYER_ONE_ID]
                 duelo["nome_oponente_2"] = player_names[PLAYER_TWO_ID]
-                canvas = draw_panel(frame, duelo, estado)
+                canvas = draw_panel_main(frame, duelo, estado)
 
                 cv2.imshow(WINDOW_NAME, canvas)
                 key = cv2.waitKey(1) & 0xFF
