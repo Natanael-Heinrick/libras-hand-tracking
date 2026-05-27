@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import base64
 import csv
+import json
+import queue
 import random
 import time
 from pathlib import Path
@@ -9,6 +12,12 @@ import cv2
 import numpy as np
 
 from loja.state import add_points, get_points
+from ui_decor import get_floating_hands_css, get_floating_hands_markup
+
+try:
+    import webview
+except ImportError:
+    webview = None
 
 
 WINDOW_NAME = "Quiz Visual de LIBRAS"
@@ -335,7 +344,253 @@ def advance_index(index: int, total: int) -> int:
     return (index + 1) % total
 
 
-def main():
+def image_path_to_data_url(path: Path) -> str:
+    mime = "image/png" if path.suffix.lower() == ".png" else "image/jpeg"
+    return f"data:{mime};base64,{base64.b64encode(path.read_bytes()).decode('ascii')}"
+
+
+def build_quiz_html() -> str:
+    return """
+<!doctype html>
+<html lang="pt-BR">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Quiz Visual de LIBRAS</title>
+    <style>
+        :root { --surface:#fff; --soft:#fff4c9; --ink:#1d2735; --muted:#65758b; --line:#ffd36a; --blue:#2577ff; --green:#00a978; --amber:#ffb000; --red:#ef4444; --pink:#ff5c8a; --purple:#7c5cff; --cyan:#00b8d9; }
+        * { box-sizing: border-box; }
+        body { margin:0; min-height:100vh; font-family:"Segoe UI", Arial, sans-serif; color:var(--ink); background:linear-gradient(135deg,rgba(255,176,0,.18) 0 18%,transparent 18%),linear-gradient(45deg,rgba(0,184,217,.16) 0 15%,transparent 15%),linear-gradient(160deg,#fff8e8 0%,#e9f8ff 52%,#fff0f6 100%); }
+        .app { min-height:100vh; display:grid; grid-template-columns:minmax(360px,42vw) 1fr; gap:22px; padding:22px; position:relative; z-index:1; }
+        .panel { background:var(--surface); border:2px solid var(--line); border-radius:8px; box-shadow:0 16px 40px rgba(29,45,68,.1); }
+        .image-panel { padding:16px; align-self:start; }
+        #letter-image { width:100%; aspect-ratio:1/1; object-fit:contain; border-radius:8px; background:#fff; border:1px solid var(--line); display:block; }
+        .info { padding:22px; display:grid; gap:14px; align-content:start; }
+        h1 { margin:0; font-size:2rem; letter-spacing:0; }
+        .lead { margin:4px 0 2px; color:var(--muted); line-height:1.45; }
+        .grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; }
+        .card { min-height:104px; padding:15px; border:2px solid var(--card-color,var(--line)); border-radius:8px; background:linear-gradient(180deg,#ffffff 0%,var(--soft) 100%); }
+        .card:nth-child(1) { --card-color:var(--blue); }
+        .card:nth-child(2) { --card-color:var(--green); }
+        .card:nth-child(3) { --card-color:var(--pink); }
+        .card:nth-child(4) { --card-color:var(--amber); }
+        .card:nth-child(5) { --card-color:var(--purple); }
+        .card:nth-child(6) { --card-color:var(--cyan); }
+        .wide { grid-column:1/-1; }
+        .span2 { grid-column:span 2; }
+        .label { color:var(--muted); font-size:.76rem; text-transform:uppercase; font-weight:800; letter-spacing:.04em; }
+        .value { margin-top:9px; font-size:1.7rem; font-weight:850; word-break:break-word; }
+        .answer { color:var(--blue); font-size:2.2rem; }
+        .status { color:var(--green); }
+        input { width:100%; min-height:48px; border:1px solid var(--line); border-radius:8px; padding:0 14px; font:inherit; font-weight:800; }
+        .actions { display:flex; flex-wrap:wrap; gap:9px; }
+        button { min-height:40px; border:1px solid var(--line); border-radius:8px; background:white; color:var(--ink); padding:0 12px; font:inherit; font-weight:800; cursor:pointer; }
+        button.primary { background:var(--blue); border-color:var(--blue); color:white; }
+        button:nth-child(2) { border-color:var(--amber); background:#fff2bd; }
+        button:nth-child(3) { border-color:var(--cyan); background:#dff8ff; }
+        button.warn { background:var(--red); border-color:var(--red); color:white; }
+        @media (max-width:900px) { .app { grid-template-columns:1fr; padding:14px; } .grid { grid-template-columns:1fr; } .span2 { grid-column:1; } }
+        __FLOATING_HANDS_CSS__
+    </style>
+</head>
+<body>
+    __FLOATING_HANDS_MARKUP__
+    <div class="app">
+        <section class="panel image-panel">
+            <img id="letter-image" alt="Imagem da letra">
+        </section>
+        <main class="panel info">
+            <div>
+                <h1>Quiz Visual de LIBRAS</h1>
+                <p class="lead">Veja a sequencia de imagens e digite a palavra formada.</p>
+            </div>
+            <section class="grid">
+                <article class="card"><div class="label">Rodada</div><div class="value" id="round">--</div></article>
+                <article class="card"><div class="label">Pontos</div><div class="value" id="score">0</div></article>
+                <article class="card"><div class="label">Vidas</div><div class="value" id="lives">3/3</div></article>
+                <article class="card span2"><div class="label">Etapa</div><div class="value" id="stage">Preview</div></article>
+                <article class="card"><div class="label">Dificuldade</div><div class="value" id="difficulty">--</div></article>
+                <article class="card wide">
+                    <div class="label">Sua resposta</div>
+                    <input id="answer" autocomplete="off" autofocus>
+                </article>
+                <article class="card wide"><div class="label">Status</div><div class="value status" id="feedback">Aguarde a sequencia terminar.</div></article>
+            </section>
+            <div class="actions">
+                <button class="primary" onclick="submitAnswer()">Enter Confirmar</button>
+                <button onclick="action('repeat')">1 Repetir</button>
+                <button onclick="action('next')">2 Proxima</button>
+                <button class="warn" onclick="window.pywebview.api.close()">0 Sair</button>
+            </div>
+        </main>
+    </div>
+    <script>
+        function action(name, value) { window.pywebview.api.action({name, value}); }
+        function submitAnswer() { action('submit', document.getElementById('answer').value); }
+        function updateQuiz(state) {
+            document.getElementById('letter-image').src = state.image || '';
+            document.getElementById('round').textContent = state.round + '/' + state.total;
+            document.getElementById('score').textContent = state.score;
+            document.getElementById('lives').textContent = state.lives + '/' + state.max_lives;
+            document.getElementById('stage').textContent = state.stage_text;
+            document.getElementById('difficulty').textContent = state.difficulty;
+            document.getElementById('feedback').textContent = state.feedback;
+            if (state.clear_answer) document.getElementById('answer').value = '';
+            document.getElementById('answer').disabled = state.stage !== 'answer';
+        }
+        document.getElementById('answer').addEventListener('keydown', (event) => {
+            if (event.key === 'Enter') submitAnswer();
+        });
+        document.addEventListener('keydown', (event) => {
+            if (event.key === '1') action('repeat');
+            if (event.key === '2') action('next');
+            if (event.key === '0' || event.key === 'Escape') window.pywebview.api.close();
+        });
+    </script>
+</body>
+</html>
+""".replace("__FLOATING_HANDS_CSS__", get_floating_hands_css()).replace(
+        "__FLOATING_HANDS_MARKUP__", get_floating_hands_markup()
+    )
+
+
+class QuizApi:
+    def __init__(self):
+        self.actions = queue.Queue()
+        self.window = None
+        self.closed = False
+
+    def action(self, payload):
+        self.actions.put(dict(payload or {}))
+
+    def close(self):
+        self.closed = True
+        if self.window:
+            self.window.destroy()
+
+
+def run_webview_quiz_loop(window, api):
+    letter_images = load_letter_images()
+    if not letter_images:
+        raise RuntimeError("Nenhuma imagem de letra encontrada em quiz_visual_libras/imagens_maos")
+
+    challenges, source = load_words(letter_images)
+    if not challenges:
+        raise RuntimeError("Nenhuma palavra valida encontrada para o quiz visual")
+
+    random.shuffle(challenges)
+    challenge_index = 0
+    score = get_points()
+    lives = MAX_LIVES
+    feedback = "Aguarde a sequencia terminar."
+    stage = "preview"
+    sequence_index = 0
+    last_switch = time.monotonic()
+    clear_answer = False
+
+    while not api.closed:
+        challenge = challenges[challenge_index]
+        if stage == "preview" and time.monotonic() - last_switch >= DISPLAY_SECONDS_PER_LETTER:
+            sequence_index += 1
+            last_switch = time.monotonic()
+            if sequence_index >= len(challenge["word"]):
+                stage = "answer"
+                sequence_index = len(challenge["word"]) - 1
+                feedback = "Digite a palavra e pressione ENTER."
+                clear_answer = True
+
+        while True:
+            try:
+                payload = api.actions.get_nowait()
+            except queue.Empty:
+                break
+
+            name = payload.get("name")
+            if name == "submit" and stage == "answer":
+                normalized = normalize_word(payload.get("value", ""))
+                if normalized == challenge["word"]:
+                    score = add_points(1)
+                    lives = MAX_LIVES
+                    feedback = f"Acertou: {challenge['word']}. Indo para a proxima."
+                    challenge_index = advance_index(challenge_index, len(challenges))
+                    stage = "preview"
+                    sequence_index = 0
+                    last_switch = time.monotonic()
+                else:
+                    lives -= 1
+                    if lives <= 0:
+                        score = add_points(-1)
+                        lives = MAX_LIVES
+                        stage = "preview"
+                        sequence_index = 0
+                        feedback = "Perdeu as 3 chances. Voltando ao inicio da palavra e removendo 1 ponto."
+                        last_switch = time.monotonic()
+                    else:
+                        feedback = f"Resposta incorreta. Restam {lives} chance(s)."
+                clear_answer = True
+            elif name == "repeat":
+                stage = "preview"
+                sequence_index = 0
+                feedback = f"Repetindo a sequencia. Vidas atuais: {lives}."
+                last_switch = time.monotonic()
+                clear_answer = True
+            elif name == "next":
+                challenge_index = advance_index(challenge_index, len(challenges))
+                stage = "preview"
+                sequence_index = 0
+                lives = MAX_LIVES
+                feedback = "Pulou para a proxima palavra."
+                last_switch = time.monotonic()
+                clear_answer = True
+
+        current_letter = challenge["word"][sequence_index]
+        state = {
+            "image": image_path_to_data_url(letter_images[current_letter]),
+            "round": challenge_index + 1,
+            "total": len(challenges),
+            "score": score,
+            "lives": lives,
+            "max_lives": MAX_LIVES,
+            "stage": stage,
+            "stage_text": (
+                f"Mostrando imagem {sequence_index + 1} de {len(challenge['word'])}"
+                if stage == "preview"
+                else "Digite a palavra"
+            ),
+            "difficulty": challenge.get("difficulty", "nao informada"),
+            "feedback": feedback,
+            "source": source,
+            "clear_answer": clear_answer,
+        }
+        clear_answer = False
+        window.evaluate_js("window.updateQuiz(" + json.dumps(state) + ");")
+        time.sleep(0.08)
+
+
+def start_webview_quiz(window, api):
+    try:
+        run_webview_quiz_loop(window, api)
+    except Exception as exc:
+        print(f"Erro na interface HTML do quiz visual: {exc}")
+        api.closed = True
+
+
+def run_webview_app():
+    api = QuizApi()
+    window = webview.create_window(
+        WINDOW_NAME,
+        html=build_quiz_html(),
+        js_api=api,
+        width=1180,
+        height=720,
+        resizable=True,
+    )
+    api.window = window
+    window.events.closed += lambda: setattr(api, "closed", True)
+    webview.start(start_webview_quiz, (window, api), debug=False)
+
+
+def run_cv2_quiz():
     letter_images = load_letter_images()
     if not letter_images:
         raise RuntimeError("Nenhuma imagem de letra encontrada em quiz_visual_libras/imagens_maos")
@@ -441,6 +696,15 @@ def main():
             typed_answer += chr(key)
 
     cv2.destroyAllWindows()
+
+
+def main():
+    if webview is not None:
+        run_webview_app()
+        return
+
+    print("pywebview nao esta instalado; abrindo quiz visual com interface antiga em OpenCV.")
+    run_cv2_quiz()
 
 
 if __name__ == "__main__":

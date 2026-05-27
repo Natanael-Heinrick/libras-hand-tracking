@@ -1,11 +1,18 @@
 from __future__ import annotations
 
+import base64
 from pathlib import Path
 
 import cv2
 import numpy as np
 
 from loja.state import LOOKS_DIR, get_points_label, load_shop_items, load_state, save_state, spend_points, sync_shop_catalog
+from ui_decor import get_floating_hands_css, get_floating_hands_markup
+
+try:
+    import webview
+except ImportError:
+    webview = None
 
 
 WINDOW_NAME = "Loja LIBRAS"
@@ -249,7 +256,240 @@ def render_shop(items: list[dict], state: dict, selected_index: int, feedback: s
     return canvas
 
 
-def main():
+def shop_image_data_url(item: dict) -> str:
+    if not item:
+        return ""
+    image_path = LOOKS_DIR / item["file"]
+    if not image_path.exists():
+        return ""
+    mime = "image/png" if image_path.suffix.lower() == ".png" else "image/jpeg"
+    return f"data:{mime};base64,{base64.b64encode(image_path.read_bytes()).decode('ascii')}"
+
+
+def build_shop_html() -> str:
+    return """
+<!doctype html>
+<html lang="pt-BR">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Loja LIBRAS</title>
+    <style>
+        :root { --surface:#fff; --soft:#fff4c9; --ink:#1d2735; --muted:#65758b; --line:#ffd36a; --blue:#2577ff; --green:#00a978; --amber:#ffb000; --red:#ef4444; --pink:#ff5c8a; --purple:#7c5cff; --cyan:#00b8d9; }
+        * { box-sizing:border-box; }
+        body { margin:0; min-height:100vh; font-family:"Segoe UI", Arial, sans-serif; color:var(--ink); background:linear-gradient(135deg,rgba(255,176,0,.18) 0 18%,transparent 18%),linear-gradient(45deg,rgba(124,92,255,.13) 0 16%,transparent 16%),linear-gradient(160deg,#fff8e8 0%,#e9f8ff 52%,#fff0f6 100%); }
+        .app { min-height:100vh; display:grid; grid-template-columns:minmax(360px,46vw) 1fr; gap:22px; padding:22px; position:relative; z-index:1; }
+        .panel { background:var(--surface); border:2px solid var(--line); border-radius:8px; box-shadow:0 16px 40px rgba(29,45,68,.1); }
+        .catalog, .preview { padding:22px; }
+        h1 { margin:0; font-size:2rem; letter-spacing:0; }
+        .lead { margin:6px 0 18px; color:var(--muted); line-height:1.45; }
+        .top { display:flex; justify-content:space-between; gap:12px; align-items:start; }
+        .points { min-height:44px; display:inline-flex; align-items:center; border:2px solid var(--amber); border-radius:8px; padding:0 14px; background:#fff2bd; font-weight:850; color:#9a5d00; }
+        .items { display:grid; gap:10px; }
+        .item { display:grid; grid-template-columns:1fr auto; gap:12px; align-items:center; width:100%; min-height:70px; border:2px solid var(--item-color,var(--line)); border-radius:8px; background:#fff; padding:12px; text-align:left; cursor:pointer; }
+        .item:nth-child(1) { --item-color:var(--blue); }
+        .item:nth-child(2) { --item-color:var(--green); }
+        .item:nth-child(3) { --item-color:var(--amber); }
+        .item:nth-child(4) { --item-color:var(--pink); }
+        .item:nth-child(5) { --item-color:var(--purple); }
+        .item:nth-child(6) { --item-color:var(--cyan); }
+        .item.active { border-color:var(--blue); box-shadow:0 10px 28px rgba(47,111,237,.16); background:#f0f7ff; }
+        .name { font-weight:850; }
+        .desc { margin-top:4px; color:var(--muted); font-size:.92rem; }
+        .badge { display:inline-flex; min-height:30px; align-items:center; border-radius:999px; padding:0 11px; background:var(--soft); border:1px solid var(--line); font-weight:850; white-space:nowrap; }
+        #preview-image { width:100%; aspect-ratio:4/3; object-fit:contain; border-radius:8px; border:1px solid var(--line); background:var(--soft); display:block; }
+        .detail { margin-top:14px; border:1px solid var(--line); background:var(--soft); border-radius:8px; padding:16px; }
+        .detail-title { font-size:1.5rem; font-weight:850; }
+        .feedback { margin-top:14px; border-left:5px solid var(--green); background:#fff; border-radius:8px; padding:14px; font-weight:800; }
+        .actions { display:flex; flex-wrap:wrap; gap:9px; margin-top:14px; }
+        button { min-height:40px; border:1px solid var(--line); border-radius:8px; background:white; color:var(--ink); padding:0 12px; font:inherit; font-weight:800; cursor:pointer; }
+        button.primary { background:var(--blue); border-color:var(--blue); color:white; }
+        button.good { background:var(--green); border-color:var(--green); color:white; }
+        button.warn { background:var(--red); border-color:var(--red); color:white; }
+        button:nth-child(1), button:nth-child(2) { border-color:var(--amber); background:#fff2bd; }
+        button:nth-child(5) { border-color:var(--cyan); background:#dff8ff; }
+        @media (max-width:900px) { .app { grid-template-columns:1fr; padding:14px; } .top { display:block; } .points { margin-top:12px; } }
+        __FLOATING_HANDS_CSS__
+    </style>
+</head>
+<body>
+    __FLOATING_HANDS_MARKUP__
+    <div class="app">
+        <section class="panel catalog">
+            <div class="top">
+                <div>
+                    <h1>Loja LIBRAS</h1>
+                    <p class="lead">Escolha, compre e equipe um look para o personagem.</p>
+                </div>
+                <div class="points" id="points">Pontos --</div>
+            </div>
+            <div class="items" id="items"></div>
+            <div class="feedback" id="feedback">Loja pronta.</div>
+        </section>
+        <section class="panel preview">
+            <img id="preview-image" alt="Preview do look">
+            <div class="detail">
+                <div class="detail-title" id="selected-name">Nenhum look</div>
+                <p class="lead" id="selected-description"></p>
+                <span class="badge" id="selected-status">--</span>
+            </div>
+            <div class="actions">
+                <button onclick="call('previous')">1 Subir</button>
+                <button onclick="call('next')">2 Descer</button>
+                <button class="primary" onclick="call('buy')">3 Comprar</button>
+                <button class="good" onclick="call('equip')">4 Equipar</button>
+                <button onclick="call('refresh')">5 Atualizar</button>
+                <button class="warn" onclick="window.pywebview.api.close()">0 Sair</button>
+            </div>
+        </section>
+    </div>
+    <script>
+        function statusText(item, state) {
+            if (!item) return "--";
+            const owned = (state.owned_items || []).includes(item.id);
+            const equipped = state.equipped_item === item.id;
+            if (equipped) return "Equipado";
+            if (owned) return "Comprado";
+            return item.price + " pts";
+        }
+        function renderShop(data) {
+            document.getElementById('points').textContent = 'Pontos ' + data.points;
+            document.getElementById('feedback').textContent = data.feedback;
+            const items = document.getElementById('items');
+            items.innerHTML = '';
+            data.items.forEach((item, index) => {
+                const button = document.createElement('button');
+                button.className = 'item' + (index === data.selected_index ? ' active' : '');
+                button.onclick = () => window.pywebview.api.select(index).then(renderShop);
+                button.innerHTML = '<span><span class="name"></span><span class="desc"></span></span><span class="badge"></span>';
+                button.querySelector('.name').textContent = item.name;
+                button.querySelector('.desc').textContent = item.description || '';
+                button.querySelector('.badge').textContent = statusText(item, data.state);
+                items.appendChild(button);
+            });
+            const selected = data.selected_item || {};
+            document.getElementById('preview-image').src = data.preview || '';
+            document.getElementById('selected-name').textContent = selected.name || 'Nenhum look';
+            document.getElementById('selected-description').textContent = selected.description || '';
+            document.getElementById('selected-status').textContent = statusText(selected, data.state || {});
+        }
+        function call(name) { window.pywebview.api[name]().then(renderShop); }
+        document.addEventListener('keydown', (event) => {
+            if (event.key === '1') call('previous');
+            if (event.key === '2') call('next');
+            if (event.key === '3') call('buy');
+            if (event.key === '4') call('equip');
+            if (event.key === '5') call('refresh');
+            if (event.key === '0' || event.key === 'Escape') window.pywebview.api.close();
+        });
+        window.addEventListener('pywebviewready', () => window.pywebview.api.snapshot().then(renderShop));
+    </script>
+</body>
+</html>
+""".replace("__FLOATING_HANDS_CSS__", get_floating_hands_css()).replace(
+        "__FLOATING_HANDS_MARKUP__", get_floating_hands_markup()
+    )
+
+
+class ShopApi:
+    def __init__(self):
+        self.selected_index = 0
+        self.feedback = "Loja pronta. Seus looks foram carregados e os pontos infinitos estao ativos para teste."
+        sync_shop_catalog()
+
+    def snapshot(self):
+        items = load_shop_items()
+        state = load_state()
+        if self.selected_index >= len(items):
+            self.selected_index = 0
+        selected_item = items[self.selected_index] if items else {}
+        return {
+            "items": items,
+            "state": state,
+            "selected_index": self.selected_index,
+            "selected_item": selected_item,
+            "preview": shop_image_data_url(selected_item),
+            "points": get_points_label(),
+            "feedback": self.feedback,
+        }
+
+    def select(self, index):
+        items = load_shop_items()
+        if items:
+            self.selected_index = max(0, min(int(index), len(items) - 1))
+        return self.snapshot()
+
+    def previous(self):
+        items = load_shop_items()
+        if items:
+            self.selected_index = (self.selected_index - 1) % len(items)
+        return self.snapshot()
+
+    def next(self):
+        items = load_shop_items()
+        if items:
+            self.selected_index = (self.selected_index + 1) % len(items)
+        return self.snapshot()
+
+    def refresh(self):
+        sync_shop_catalog()
+        self.feedback = "Catalogo atualizado com os arquivos da pasta."
+        return self.snapshot()
+
+    def buy(self):
+        items = load_shop_items()
+        if not items:
+            self.feedback = "Nenhum look disponivel."
+            return self.snapshot()
+        state = load_state()
+        selected_item = items[self.selected_index]
+        owned_items = state.get("owned_items", [])
+        if selected_item["id"] in owned_items:
+            self.feedback = "Esse look ja foi comprado."
+            return self.snapshot()
+        success, _ = spend_points(selected_item["price"])
+        if not success:
+            self.feedback = "Pontos insuficientes para comprar esse look."
+            return self.snapshot()
+        state = load_state()
+        state["owned_items"] = owned_items + [selected_item["id"]]
+        save_state(state)
+        self.feedback = f"Compra concluida: {selected_item['name']}."
+        return self.snapshot()
+
+    def equip(self):
+        items = load_shop_items()
+        if not items:
+            self.feedback = "Nenhum look disponivel."
+            return self.snapshot()
+        state = load_state()
+        selected_item = items[self.selected_index]
+        if selected_item["id"] not in state.get("owned_items", []):
+            self.feedback = "Compre o look antes de equipar."
+            return self.snapshot()
+        state["equipped_item"] = selected_item["id"]
+        save_state(state)
+        self.feedback = f"Look equipado: {selected_item['name']}."
+        return self.snapshot()
+
+    def close(self):
+        if webview.windows:
+            webview.windows[0].destroy()
+
+
+def run_webview_app():
+    webview.create_window(
+        WINDOW_NAME,
+        html=build_shop_html(),
+        js_api=ShopApi(),
+        width=1180,
+        height=720,
+        resizable=True,
+    )
+    webview.start(debug=False)
+
+
+def run_cv2_shop():
     items = sync_shop_catalog()
     state = load_state()
     selected_index = 0
@@ -314,6 +554,15 @@ def main():
             continue
 
     cv2.destroyAllWindows()
+
+
+def main():
+    if webview is not None:
+        run_webview_app()
+        return
+
+    print("pywebview nao esta instalado; abrindo loja com interface antiga em OpenCV.")
+    run_cv2_shop()
 
 
 if __name__ == "__main__":

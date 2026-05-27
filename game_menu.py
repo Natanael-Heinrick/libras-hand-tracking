@@ -10,6 +10,12 @@ import cv2
 import numpy as np
 
 from loja.state import get_points_label
+from ui_decor import get_floating_hands_css, get_floating_hands_markup
+
+try:
+    import webview
+except ImportError:
+    webview = None
 
 
 WINDOW_NAME = "Menu de Jogos LIBRAS"
@@ -356,7 +362,247 @@ def handle_mouse(event, x, y, flags, param):
             break
 
 
-def main():
+def build_menu_html() -> str:
+    buttons_html = "\n".join(
+        f"""
+        <button class="mode-card" data-index="{idx}" onclick="selectMode({idx})">
+            <span class="number">{idx + 1}</span>
+            <span>
+                <strong>{button["label"]}</strong>
+                <small>{button["description"]}</small>
+            </span>
+        </button>
+        """
+        for idx, button in enumerate(BUTTONS)
+    )
+    return f"""
+<!doctype html>
+<html lang="pt-BR">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>LIBRAS Quest</title>
+    <style>
+        :root {{
+            color-scheme: light;
+            --bg: #fff8e8;
+            --surface: #ffffff;
+            --surface-2: #fff2bf;
+            --ink: #243044;
+            --muted: #667085;
+            --line: #ffd36a;
+            --blue: #2577ff;
+            --green: #00a978;
+            --amber: #ffb000;
+            --pink: #ff5c8a;
+            --purple: #7c5cff;
+            --cyan: #00b8d9;
+        }}
+        * {{ box-sizing: border-box; }}
+        body {{
+            margin: 0;
+            min-height: 100vh;
+            font-family: "Segoe UI", Arial, sans-serif;
+            color: var(--ink);
+            background:
+                linear-gradient(135deg, rgba(255, 176, 0, .18) 0 18%, transparent 18% 100%),
+                linear-gradient(45deg, rgba(0, 184, 217, .16) 0 16%, transparent 16% 100%),
+                linear-gradient(160deg, #fff8e8 0%, #e9f8ff 52%, #fff0f6 100%);
+        }}
+        .shell {{
+            min-height: 100vh;
+            display: grid;
+            grid-template-columns: minmax(280px, 360px) 1fr;
+            position: relative;
+            z-index: 1;
+        }}
+        aside {{
+            padding: 44px 34px;
+            background: linear-gradient(180deg, #27336b 0%, #18234d 100%);
+            color: white;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            border-right: 8px solid var(--amber);
+        }}
+        h1 {{
+            margin: 0;
+            font-size: 2.8rem;
+            line-height: .95;
+            letter-spacing: 0;
+        }}
+        .subtitle {{
+            margin-top: 18px;
+            color: #b8c7dc;
+            line-height: 1.5;
+        }}
+        .points {{
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            margin-top: 28px;
+            padding: 12px 14px;
+            border: 2px solid rgba(255,255,255,.28);
+            background: linear-gradient(135deg, rgba(255,176,0,.3), rgba(0,184,217,.22));
+            border-radius: 8px;
+            font-weight: 700;
+        }}
+        main {{
+            padding: 42px;
+            display: grid;
+            align-content: center;
+        }}
+        .topline {{
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 16px;
+            margin-bottom: 18px;
+            color: var(--muted);
+            font-weight: 600;
+        }}
+        .modes {{
+            display: grid;
+            gap: 12px;
+            max-width: 760px;
+        }}
+        .mode-card {{
+            width: 100%;
+            min-height: 82px;
+            display: grid;
+            grid-template-columns: 52px 1fr;
+            gap: 16px;
+            align-items: center;
+            text-align: left;
+            border: 1px solid var(--line);
+            background:
+                linear-gradient(90deg, rgba(255,255,255,.95), rgba(255,255,255,.95)),
+                linear-gradient(135deg, var(--card-a), var(--card-b));
+            color: var(--ink);
+            border-radius: 8px;
+            padding: 16px;
+            cursor: pointer;
+            box-shadow: 0 10px 24px rgba(25, 39, 60, .08);
+        }}
+        .mode-card:hover, .mode-card.active {{
+            border-color: var(--card-b);
+            box-shadow: 0 14px 34px rgba(47, 111, 237, .18);
+            transform: translateY(-1px);
+        }}
+        .mode-card:nth-child(1) {{ --card-a: #00b8d9; --card-b: #2577ff; }}
+        .mode-card:nth-child(2) {{ --card-a: #00a978; --card-b: #7ed957; }}
+        .mode-card:nth-child(3) {{ --card-a: #ffb000; --card-b: #ff7a00; }}
+        .mode-card:nth-child(4) {{ --card-a: #ff5c8a; --card-b: #7c5cff; }}
+        .mode-card:nth-child(5) {{ --card-a: #7c5cff; --card-b: #00b8d9; }}
+        .number {{
+            width: 44px;
+            height: 44px;
+            display: grid;
+            place-items: center;
+            border-radius: 8px;
+            background: linear-gradient(135deg, var(--card-a), var(--card-b));
+            color: white;
+            font-weight: 800;
+        }}
+        strong {{
+            display: block;
+            font-size: 1.08rem;
+            margin-bottom: 6px;
+        }}
+        small {{
+            display: block;
+            color: var(--muted);
+            font-size: .92rem;
+            line-height: 1.35;
+        }}
+        .footer {{
+            margin-top: 20px;
+            color: var(--muted);
+            font-size: .92rem;
+        }}
+        {get_floating_hands_css()}
+    </style>
+</head>
+<body>
+    {get_floating_hands_markup()}
+    <div class="shell">
+        <aside>
+            <div>
+                <h1>LIBRAS<br>Quest</h1>
+                <p class="subtitle">Escolha uma atividade e continue treinando sinais em uma janela de aplicativo.</p>
+                <div class="points">Pontos: {get_points_label()}</div>
+            </div>
+            <div>ESC fecha o menu</div>
+        </aside>
+        <main>
+            <div class="topline">
+                <span>Modos disponiveis</span>
+                <span>Use 1-5 ou clique</span>
+            </div>
+            <section class="modes">{buttons_html}</section>
+            <div class="footer">Enter abre o item selecionado. Setas mudam a selecao.</div>
+        </main>
+    </div>
+    <script>
+        let selected = 0;
+        const cards = Array.from(document.querySelectorAll(".mode-card"));
+        function paint() {{
+            cards.forEach((card, index) => card.classList.toggle("active", index === selected));
+        }}
+        function selectMode(index) {{
+            selected = index;
+            paint();
+            window.pywebview.api.launch(index);
+        }}
+        document.addEventListener("keydown", (event) => {{
+            if (event.key === "Escape") window.pywebview.api.close();
+            if (event.key === "ArrowDown" || event.key.toLowerCase() === "s") {{
+                selected = (selected + 1) % cards.length;
+                paint();
+            }}
+            if (event.key === "ArrowUp" || event.key.toLowerCase() === "w") {{
+                selected = (selected - 1 + cards.length) % cards.length;
+                paint();
+            }}
+            if (event.key === "Enter") selectMode(selected);
+            if (/^[1-5]$/.test(event.key)) selectMode(Number(event.key) - 1);
+        }});
+        paint();
+    </script>
+</body>
+</html>
+"""
+
+
+class MenuApi:
+    def __init__(self):
+        self.window = None
+
+    def launch(self, index):
+        button_idx = int(index)
+        if 0 <= button_idx < len(BUTTONS):
+            launch_button(BUTTONS[button_idx])
+
+    def close(self):
+        if self.window:
+            self.window.destroy()
+
+
+def run_webview_menu():
+    api = MenuApi()
+    window = webview.create_window(
+        WINDOW_NAME,
+        html=build_menu_html(),
+        js_api=api,
+        width=1040,
+        height=680,
+        resizable=True,
+    )
+    api.window = window
+    webview.start(debug=False)
+
+
+def run_cv2_menu():
     global selected_index
     cv2.namedWindow(WINDOW_NAME, cv2.WINDOW_NORMAL)
     cv2.resizeWindow(WINDOW_NAME, CANVAS_WIDTH, CANVAS_HEIGHT)
@@ -385,6 +631,15 @@ def main():
                 launch_button(BUTTONS[button_idx])
 
     cv2.destroyAllWindows()
+
+
+def main():
+    if webview is not None:
+        run_webview_menu()
+        return
+
+    print("pywebview nao esta instalado; abrindo o menu antigo em OpenCV.")
+    run_cv2_menu()
 
 
 if __name__ == "__main__":

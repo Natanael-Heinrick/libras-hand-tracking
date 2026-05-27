@@ -1,10 +1,18 @@
 import asyncio
 import base64
 import json
+import queue
 
 import cv2
 import numpy as np
 from websockets.asyncio.client import connect
+
+from ui_decor import get_floating_hands_css, get_floating_hands_markup
+
+try:
+    import webview
+except ImportError:
+    webview = None
 
 
 SERVER_URL = "ws://127.0.0.1:8765/duelo"
@@ -569,12 +577,430 @@ def draw_panel_main(frame, duelo, estado):
     return canvas
 
 
+def build_duel_html() -> str:
+    return """
+<!doctype html>
+<html lang="pt-BR">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Duelo de Tempo LIBRAS</title>
+    <style>
+        :root {
+            --bg: #fff8e8;
+            --surface: #ffffff;
+            --soft: #fff4c9;
+            --ink: #1d2735;
+            --muted: #65758b;
+            --line: #ffd36a;
+            --blue: #2577ff;
+            --green: #00a978;
+            --amber: #ffb000;
+            --red: #ef4444;
+            --pink: #ff5c8a;
+            --purple: #7c5cff;
+            --cyan: #00b8d9;
+            --p1: #ff7a00;
+            --p2: #2577ff;
+        }
+        * { box-sizing: border-box; }
+        body {
+            margin: 0;
+            min-height: 100vh;
+            font-family: "Segoe UI", Arial, sans-serif;
+            color: var(--ink);
+            background:
+                linear-gradient(135deg, rgba(255,176,0,.18) 0 18%, transparent 18%),
+                linear-gradient(45deg, rgba(124,92,255,.13) 0 16%, transparent 16%),
+                linear-gradient(160deg, #fff8e8 0%, #e9f8ff 52%, #fff0f6 100%);
+        }
+        .screen {
+            min-height: 100vh;
+            padding: 22px;
+            position: relative;
+            z-index: 1;
+        }
+        .setup {
+            min-height: calc(100vh - 44px);
+            display: grid;
+            place-items: center;
+        }
+        .setup-card, .panel {
+            background: var(--surface);
+            border: 2px solid var(--line);
+            border-radius: 8px;
+            box-shadow: 0 16px 40px rgba(29,45,68,.1);
+        }
+        .setup-card {
+            width: min(720px, 100%);
+            padding: 28px;
+        }
+        h1 { margin: 0; font-size: 2.1rem; letter-spacing: 0; }
+        .lead { margin: 8px 0 22px; color: var(--muted); line-height: 1.45; }
+        label {
+            display: block;
+            color: var(--muted);
+            font-weight: 800;
+            margin: 14px 0 8px;
+        }
+        input {
+            width: 100%;
+            min-height: 48px;
+            border: 1px solid var(--line);
+            border-radius: 8px;
+            padding: 0 14px;
+            font: inherit;
+            font-weight: 700;
+            color: var(--ink);
+        }
+        .app {
+            min-height: calc(100vh - 44px);
+            display: none;
+            grid-template-columns: minmax(360px, 42vw) 1fr;
+            gap: 22px;
+        }
+        .camera-panel { align-self: start; padding: 16px; }
+        .camera-panel { border-color: var(--cyan); }
+        .camera-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+            color: var(--muted);
+            font-weight: 800;
+        }
+        .dot {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: var(--green);
+            margin-right: 8px;
+        }
+        #camera {
+            display: block;
+            width: 100%;
+            aspect-ratio: 4 / 3;
+            object-fit: cover;
+            border-radius: 6px;
+            background: #172033;
+        }
+        .info {
+            padding: 22px;
+            display: grid;
+            gap: 14px;
+            align-content: start;
+        }
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 12px;
+        }
+        .card {
+            min-height: 104px;
+            padding: 15px;
+            border: 2px solid var(--card-color, var(--line));
+            border-radius: 8px;
+            background: linear-gradient(180deg, #ffffff 0%, var(--soft) 100%);
+        }
+        .grid .card:nth-child(1) { --card-color: var(--amber); }
+        .grid .card:nth-child(2) { --card-color: var(--blue); }
+        .grid .card:nth-child(3) { --card-color: var(--green); }
+        .grid .card:nth-child(4) { --card-color: var(--pink); }
+        .grid .card:nth-child(5) { --card-color: var(--purple); }
+        .wide { grid-column: 1 / -1; }
+        .span2 { grid-column: span 2; }
+        .label {
+            color: var(--muted);
+            font-size: .76rem;
+            text-transform: uppercase;
+            font-weight: 800;
+            letter-spacing: .04em;
+        }
+        .value {
+            margin-top: 9px;
+            font-size: 1.6rem;
+            font-weight: 850;
+            word-break: break-word;
+        }
+        .target { color: var(--amber); font-size: 2.4rem; }
+        .letter { color: var(--blue); font-size: 3rem; line-height: 1; }
+        .word { color: var(--green); }
+        .players {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+        }
+        .player.active { border-color: var(--blue); box-shadow: inset 0 0 0 2px rgba(47,111,237,.18); }
+        #player-one { border-color: var(--p1); }
+        #player-two { border-color: var(--p2); }
+        .pname { display: flex; justify-content: space-between; gap: 10px; font-weight: 850; }
+        .lives { margin-top: 12px; color: var(--red); font-size: 1.35rem; letter-spacing: .08em; }
+        .phase {
+            border-left: 5px solid var(--blue);
+            background: #fff;
+        }
+        .actions { display: flex; flex-wrap: wrap; gap: 9px; }
+        button {
+            min-height: 40px;
+            border: 1px solid var(--line);
+            border-radius: 8px;
+            background: white;
+            color: var(--ink);
+            padding: 0 12px;
+            font: inherit;
+            font-weight: 800;
+            cursor: pointer;
+        }
+        button.primary { background: var(--blue); border-color: var(--blue); color: white; }
+        button.good { background: var(--green); border-color: var(--green); color: white; }
+        button.warn { background: var(--red); border-color: var(--red); color: white; }
+        button:nth-child(4) { border-color: var(--amber); background: #fff2bd; }
+        button:nth-child(5) { border-color: var(--cyan); background: #dff8ff; }
+        button:nth-child(6) { border-color: var(--pink); background: #ffe4ec; }
+        @media (max-width: 980px) {
+            .app { grid-template-columns: 1fr; }
+            .grid, .players { grid-template-columns: 1fr; }
+            .span2 { grid-column: 1; }
+        }
+        __FLOATING_HANDS_CSS__
+    </style>
+</head>
+<body>
+    __FLOATING_HANDS_MARKUP__
+    <div class="screen">
+        <section class="setup" id="setup">
+            <form class="setup-card" id="name-form">
+                <h1>Registro do Duelo</h1>
+                <p class="lead">Digite os nomes dos dois jogadores para iniciar a partida.</p>
+                <label for="p1">Jogador 1</label>
+                <input id="p1" maxlength="18" value="Jogador 1">
+                <label for="p2">Jogador 2</label>
+                <input id="p2" maxlength="18" value="Jogador 2">
+                <div class="actions" style="margin-top:18px">
+                    <button class="primary" type="submit">Comecar duelo</button>
+                    <button class="warn" type="button" onclick="window.pywebview.api.close()">Cancelar</button>
+                </div>
+            </form>
+        </section>
+        <section class="app" id="app">
+            <section class="panel camera-panel">
+                <div class="camera-top">
+                    <span><i class="dot"></i>Camera</span>
+                    <span id="hands">0 mao(s)</span>
+                </div>
+                <img id="camera" alt="Camera ao vivo">
+            </section>
+            <main class="panel info">
+                <div>
+                    <h1>Duelo de Tempo</h1>
+                    <p class="lead" id="phase-label">Aguardando inicio</p>
+                </div>
+                <section class="grid">
+                    <article class="card span2">
+                        <div class="label">Palavra alvo</div>
+                        <div class="value target" id="target">--</div>
+                    </article>
+                    <article class="card">
+                        <div class="label">Letra atual</div>
+                        <div class="value letter" id="letter">--</div>
+                    </article>
+                    <article class="card span2">
+                        <div class="label">Sua palavra</div>
+                        <div class="value word" id="word">_</div>
+                    </article>
+                    <article class="card">
+                        <div class="label">Tempo atual</div>
+                        <div class="value" id="current-time">--</div>
+                    </article>
+                    <article class="card wide phase">
+                        <div class="label">Mensagem</div>
+                        <div class="value" id="feedback">Prepare a rodada.</div>
+                    </article>
+                </section>
+                <section class="players">
+                    <article class="card player" id="player-one">
+                        <div class="pname"><span id="p1-name">Jogador 1</span><span id="p1-time">--</span></div>
+                        <div class="lives" id="p1-lives"></div>
+                    </article>
+                    <article class="card player" id="player-two">
+                        <div class="pname"><span id="p2-name">Jogador 2</span><span id="p2-time">--</span></div>
+                        <div class="lives" id="p2-lives"></div>
+                    </article>
+                </section>
+                <div class="actions">
+                    <button class="good" onclick="action('iniciar_duelo')">S Iniciar</button>
+                    <button class="primary" onclick="action('confirmar_letra')">Espaco Confirmar</button>
+                    <button onclick="action('validar_palavra_duelo')">Enter Validar</button>
+                    <button onclick="action('trocar_jogador_duelo')">T Trocar</button>
+                    <button onclick="action('proxima_palavra')">N Nova palavra</button>
+                    <button onclick="action('reiniciar_duelo')">R Reiniciar</button>
+                    <button onclick="action('limpar_palavra')">C Limpar</button>
+                    <button class="warn" onclick="window.pywebview.api.close()">ESC Sair</button>
+                </div>
+            </main>
+        </section>
+    </div>
+    <script>
+        document.getElementById("name-form").addEventListener("submit", (event) => {
+            event.preventDefault();
+            window.pywebview.api.set_names(
+                document.getElementById("p1").value,
+                document.getElementById("p2").value
+            );
+            document.getElementById("setup").style.display = "none";
+            document.getElementById("app").style.display = "grid";
+        });
+        function action(name) { window.pywebview.api.action(name); }
+        function lives(current, max) {
+            const filled = "V ".repeat(Math.max(0, current || 0));
+            const empty = "- ".repeat(Math.max(0, (max || 0) - (current || 0)));
+            return filled + empty;
+        }
+        function updateDuel(cameraBase64, estado, duelo) {
+            document.getElementById("camera").src = "data:image/jpeg;base64," + cameraBase64;
+            document.getElementById("hands").textContent = (estado.maos_detectadas || 0) + " mao(s)";
+            document.getElementById("target").textContent = duelo.palavra_alvo || "--";
+            document.getElementById("letter").textContent = estado.letra_estavel || estado.letra || "--";
+            document.getElementById("word").textContent = estado.palavra || "_";
+            document.getElementById("current-time").textContent = duelo.tempo_atual == null ? "--" : duelo.tempo_atual.toFixed(2) + "s";
+            document.getElementById("phase-label").textContent = duelo.fase_label || duelo.fase || "";
+            document.getElementById("feedback").textContent =
+                duelo.motivo_vitoria || duelo.mensagem_transicao || duelo.feedback || "Prepare a rodada.";
+            document.getElementById("p1-name").textContent = duelo.nome_oponente_1 || "Jogador 1";
+            document.getElementById("p2-name").textContent = duelo.nome_oponente_2 || "Jogador 2";
+            document.getElementById("p1-time").textContent = duelo.tempo_oponente_1 == null ? "--" : duelo.tempo_oponente_1.toFixed(2) + "s";
+            document.getElementById("p2-time").textContent = duelo.tempo_oponente_2 == null ? "--" : duelo.tempo_oponente_2.toFixed(2) + "s";
+            document.getElementById("p1-lives").textContent = lives(duelo.vidas_oponente_1, duelo.vidas_maximas);
+            document.getElementById("p2-lives").textContent = lives(duelo.vidas_oponente_2, duelo.vidas_maximas);
+            document.getElementById("player-one").classList.toggle("active", duelo.jogador_atual === "oponente_1");
+            document.getElementById("player-two").classList.toggle("active", duelo.jogador_atual === "oponente_2");
+        }
+        document.addEventListener("keydown", (event) => {
+            const key = event.key.toLowerCase();
+            if (document.getElementById("app").style.display !== "grid") return;
+            if (key === "s") action("iniciar_duelo");
+            if (event.key === " ") { event.preventDefault(); action("confirmar_letra"); }
+            if (event.key === "Enter") action("validar_palavra_duelo");
+            if (key === "t") action("trocar_jogador_duelo");
+            if (key === "n") action("proxima_palavra");
+            if (key === "r") action("reiniciar_duelo");
+            if (key === "c") action("limpar_palavra");
+            if (event.key === "Escape") window.pywebview.api.close();
+        });
+    </script>
+</body>
+</html>
+""".replace("__FLOATING_HANDS_CSS__", get_floating_hands_css()).replace(
+        "__FLOATING_HANDS_MARKUP__", get_floating_hands_markup()
+    )
+
+
+class DuelApi:
+    def __init__(self):
+        self.actions = queue.Queue()
+        self.window = None
+        self.closed = False
+        self.player_names = None
+
+    def set_names(self, player_one, player_two):
+        self.player_names = {
+            PLAYER_ONE_ID: normalize_player_name(player_one, "Jogador 1"),
+            PLAYER_TWO_ID: normalize_player_name(player_two, "Jogador 2"),
+        }
+
+    def action(self, action_name):
+        self.actions.put(str(action_name))
+
+    def close(self):
+        self.closed = True
+        if self.window:
+            self.window.destroy()
+
+
+async def process_duel_webview_actions(websocket, api):
+    while True:
+        try:
+            action_name = api.actions.get_nowait()
+        except queue.Empty:
+            return
+        await send_action(websocket, action_name)
+
+
+async def run_webview_duel(window, api):
+    while api.player_names is None and not api.closed:
+        await asyncio.sleep(0.05)
+    if api.closed:
+        return
+
+    player_names = api.player_names
+    camera = cv2.VideoCapture(0, cv2.CAP_DSHOW)
+    if not camera.isOpened():
+        raise RuntimeError("Erro ao acessar webcam local")
+
+    try:
+        async with connect(SERVER_URL, max_size=2**22) as websocket:
+            while not api.closed:
+                ok, frame = camera.read()
+                if not ok:
+                    raise RuntimeError("Erro ao capturar frame da webcam")
+
+                await websocket.send(json.dumps({"frame": encode_frame(frame)}))
+                response = json.loads(await websocket.recv())
+                if response.get("tipo") == "erro":
+                    raise RuntimeError(response.get("mensagem", "Erro desconhecido do servidor"))
+
+                estado = response.get("estado", {})
+                duelo = enrich_duel_labels(response.get("duelo", {}), player_names)
+                duelo["nome_oponente_1"] = player_names[PLAYER_ONE_ID]
+                duelo["nome_oponente_2"] = player_names[PLAYER_TWO_ID]
+                duelo["fase_label"] = get_phase_label(duelo.get("fase", ""))
+                camera_image = encode_frame(cv2.resize(frame, (640, 480)), quality=68)
+                window.evaluate_js(
+                    "window.updateDuel("
+                    + json.dumps(camera_image)
+                    + ", "
+                    + json.dumps(estado)
+                    + ", "
+                    + json.dumps(duelo)
+                    + ");"
+                )
+                await process_duel_webview_actions(websocket, api)
+                await asyncio.sleep(0.02)
+    finally:
+        api.closed = True
+        camera.release()
+
+
+def start_webview_duel(window, api):
+    try:
+        asyncio.run(run_webview_duel(window, api))
+    except Exception as exc:
+        print(f"Erro na interface HTML do duelo: {exc}")
+        api.closed = True
+
+
+def run_webview_app():
+    api = DuelApi()
+    window = webview.create_window(
+        WINDOW_NAME,
+        html=build_duel_html(),
+        js_api=api,
+        width=1220,
+        height=760,
+        resizable=True,
+    )
+    api.window = window
+    window.events.closed += lambda: setattr(api, "closed", True)
+    webview.start(start_webview_duel, (window, api), debug=False)
+
+
 async def send_action(websocket, action):
     await websocket.send(json.dumps({"acao": action}))
     return json.loads(await websocket.recv())
 
 
-async def main():
+async def run_cv2_duel():
     player_names = collect_player_names()
     if player_names is None:
         return
@@ -628,5 +1054,14 @@ async def main():
         cv2.destroyAllWindows()
 
 
+def main():
+    if webview is not None:
+        run_webview_app()
+        return
+
+    print("pywebview nao esta instalado; abrindo duelo com interface antiga em OpenCV.")
+    asyncio.run(run_cv2_duel())
+
+
 if __name__ == "__main__":
-    asyncio.run(main())
+    main()

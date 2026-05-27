@@ -1,6 +1,7 @@
 import asyncio
 import base64
 import json
+import queue
 import sys
 import time
 from pathlib import Path
@@ -8,6 +9,13 @@ from pathlib import Path
 import cv2
 import numpy as np
 from websockets.asyncio.client import connect
+
+from ui_decor import get_floating_hands_css, get_floating_hands_markup
+
+try:
+    import webview
+except ImportError:
+    webview = None
 
 
 SERVER_URL = "ws://127.0.0.1:8765/exercicios"
@@ -409,6 +417,488 @@ def build_exercise_canvas(frame, estado, exercicio, modo_jogo, show_hint, succes
     return canvas
 
 
+def build_exercise_html() -> str:
+    return """
+<!doctype html>
+<html lang="pt-BR">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Exercicios LIBRAS</title>
+    <style>
+        :root {
+            --bg: #fff8e8;
+            --surface: #ffffff;
+            --soft: #fff4c9;
+            --ink: #1d2735;
+            --muted: #65758b;
+            --line: #ffd36a;
+            --blue: #2577ff;
+            --green: #00a978;
+            --amber: #ffb000;
+            --red: #ef4444;
+            --pink: #ff5c8a;
+            --purple: #7c5cff;
+            --cyan: #00b8d9;
+        }
+        * { box-sizing: border-box; }
+        body {
+            margin: 0;
+            min-height: 100vh;
+            font-family: "Segoe UI", Arial, sans-serif;
+            color: var(--ink);
+            background:
+                linear-gradient(135deg, rgba(255,176,0,.18) 0 18%, transparent 18%),
+                linear-gradient(45deg, rgba(0,184,217,.16) 0 15%, transparent 15%),
+                linear-gradient(160deg, #fff8e8 0%, #e9f8ff 52%, #fff0f6 100%);
+        }
+        .app {
+            min-height: 100vh;
+            display: grid;
+            grid-template-columns: minmax(360px, 42vw) 1fr;
+            gap: 22px;
+            padding: 22px;
+            position: relative;
+            z-index: 1;
+        }
+        .panel {
+            background: var(--surface);
+            border: 2px solid var(--line);
+            border-radius: 8px;
+            box-shadow: 0 16px 40px rgba(29,45,68,.1);
+        }
+        .camera-panel { align-self: start; padding: 16px; border-color: var(--cyan); }
+        .camera-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+            color: var(--muted);
+            font-weight: 800;
+        }
+        .dot {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: var(--green);
+            margin-right: 8px;
+        }
+        #camera {
+            display: block;
+            width: 100%;
+            aspect-ratio: 4 / 3;
+            object-fit: cover;
+            border-radius: 6px;
+            background: #172033;
+        }
+        .info {
+            padding: 22px;
+            display: grid;
+            gap: 14px;
+            align-content: start;
+        }
+        h1 { margin: 0; font-size: 2rem; letter-spacing: 0; }
+        .lead { margin: 4px 0 2px; color: var(--muted); line-height: 1.45; }
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 12px;
+        }
+        .card {
+            min-height: 104px;
+            padding: 15px;
+            border: 2px solid var(--card-color, var(--line));
+            border-radius: 8px;
+            background: linear-gradient(180deg, #ffffff 0%, var(--soft) 100%);
+        }
+        .card:nth-child(1) { --card-color: var(--blue); }
+        .card:nth-child(2) { --card-color: var(--amber); }
+        .card:nth-child(3) { --card-color: var(--green); }
+        .card:nth-child(4) { --card-color: var(--pink); }
+        .card:nth-child(5) { --card-color: var(--purple); }
+        .card:nth-child(6) { --card-color: var(--cyan); }
+        .wide { grid-column: 1 / -1; }
+        .span2 { grid-column: span 2; }
+        .label {
+            color: var(--muted);
+            font-size: .76rem;
+            text-transform: uppercase;
+            font-weight: 800;
+            letter-spacing: .04em;
+        }
+        .value {
+            margin-top: 9px;
+            font-size: 1.7rem;
+            font-weight: 850;
+            word-break: break-word;
+        }
+        .target { color: var(--blue); font-size: 2.2rem; }
+        .letter { color: var(--amber); font-size: 3.2rem; line-height: 1; }
+        .word { color: var(--green); }
+        .challenge {
+            display: grid;
+            grid-template-columns: 220px 1fr;
+            gap: 14px;
+            align-items: center;
+        }
+        #challenge-image {
+            width: 100%;
+            aspect-ratio: 1 / 1;
+            object-fit: contain;
+            border-radius: 8px;
+            border: 1px solid var(--line);
+            background: white;
+            display: none;
+        }
+        .badges { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+        .badge {
+            display: inline-flex;
+            min-height: 30px;
+            align-items: center;
+            border-radius: 999px;
+            padding: 0 11px;
+            border: 1px solid var(--line);
+            background: white;
+            color: var(--muted);
+            font-weight: 800;
+            font-size: .82rem;
+        }
+        .actions { display: flex; flex-wrap: wrap; gap: 9px; }
+        button {
+            min-height: 40px;
+            border: 1px solid var(--line);
+            border-radius: 8px;
+            background: white;
+            color: var(--ink);
+            padding: 0 12px;
+            font: inherit;
+            font-weight: 800;
+            cursor: pointer;
+        }
+        button.primary { background: var(--blue); border-color: var(--blue); color: white; }
+        button.good { background: var(--green); border-color: var(--green); color: white; }
+        button.warn { background: var(--red); border-color: var(--red); color: white; }
+        button:nth-child(5), button:nth-child(8) { border-color: var(--amber); background: #fff2bd; }
+        button:nth-child(6), button:nth-child(9) { border-color: var(--cyan); background: #dff8ff; }
+        button:nth-child(7), button:nth-child(10) { border-color: var(--pink); background: #ffe4ec; }
+        @media (max-width: 980px) {
+            .app { grid-template-columns: 1fr; padding: 14px; }
+            .grid { grid-template-columns: 1fr; }
+            .span2 { grid-column: 1; }
+            .challenge { grid-template-columns: 1fr; }
+        }
+        __FLOATING_HANDS_CSS__
+    </style>
+</head>
+<body>
+    __FLOATING_HANDS_MARKUP__
+    <div class="app">
+        <section class="panel camera-panel">
+            <div class="camera-top">
+                <span><i class="dot"></i>Camera</span>
+                <span id="hands">0 mao(s)</span>
+            </div>
+            <img id="camera" alt="Camera ao vivo">
+        </section>
+        <main class="panel info">
+            <div>
+                <h1>Desafio de LIBRAS</h1>
+                <p class="lead" id="mode-label">Modo misto</p>
+            </div>
+            <section class="grid">
+                <article class="card span2">
+                    <div class="label">Objetivo</div>
+                    <div class="value target" id="target">--</div>
+                </article>
+                <article class="card">
+                    <div class="label">Letra atual</div>
+                    <div class="value letter" id="letter">--</div>
+                </article>
+                <article class="card span2">
+                    <div class="label">Sua palavra</div>
+                    <div class="value word" id="word">_</div>
+                </article>
+                <article class="card">
+                    <div class="label">Pontos</div>
+                    <div class="value" id="points">0</div>
+                </article>
+                <article class="card wide challenge" id="challenge-card">
+                    <img id="challenge-image" alt="Imagem do desafio">
+                    <div>
+                        <div class="label">Imagem do desafio</div>
+                        <div class="value" id="challenge-text">Sem imagem nesta rodada</div>
+                        <div class="badges">
+                            <span class="badge" id="hint-badge">Dica desativada</span>
+                            <span class="badge" id="difficulty">Dificuldade --</span>
+                            <span class="badge" id="round">Rodada --</span>
+                            <span class="badge" id="level">Nivel --</span>
+                        </div>
+                    </div>
+                </article>
+                <article class="card wide">
+                    <div class="label">Status</div>
+                    <div class="value" id="feedback">Aguardando sua proxima jogada.</div>
+                </article>
+            </section>
+            <div class="actions">
+                <button class="primary" onclick="action('confirmar_letra')">Espaco Confirmar</button>
+                <button onclick="action('limpar_palavra')">C Limpar</button>
+                <button onclick="action('proxima_palavra')">N Proxima</button>
+                <button onclick="action('reiniciar_exercicio')">R Reiniciar</button>
+                <button onclick="setDifficulty('facil')">1 Facil</button>
+                <button onclick="setDifficulty('medio')">2 Medio</button>
+                <button onclick="setDifficulty('dificil')">3 Dificil</button>
+                <button onclick="setMode('fotos')">F Fotos</button>
+                <button onclick="setMode('palavras')">P Palavras</button>
+                <button onclick="setMode('misto')">M Misto</button>
+                <button class="good" onclick="toggleHint()">H Dica</button>
+                <button class="warn" onclick="window.pywebview.api.close()">ESC Sair</button>
+            </div>
+        </main>
+    </div>
+    <script>
+        function action(name) { window.pywebview.api.action({acao: name}); }
+        function setDifficulty(value) { window.pywebview.api.action({acao: "definir_dificuldade", dificuldade: value}); }
+        function setMode(value) { window.pywebview.api.action({acao: "definir_modo_jogo", modo_jogo: value}); }
+        function toggleHint() { window.pywebview.api.toggle_hint(); }
+        function updateGame(cameraBase64, estado, exercicio, ui) {
+            document.getElementById("camera").src = "data:image/jpeg;base64," + cameraBase64;
+            const letter = estado.letra_estavel || estado.letra || "--";
+            const word = estado.palavra || "_";
+            const target = exercicio.tipo_desafio === "imagem"
+                ? "Descubra pela imagem"
+                : (exercicio.palavra_alvo || "--");
+            document.getElementById("letter").textContent = letter;
+            document.getElementById("word").textContent = word;
+            document.getElementById("target").textContent = target;
+            document.getElementById("points").textContent = exercicio.pontuacao ?? 0;
+            document.getElementById("hands").textContent = (estado.maos_detectadas || 0) + " mao(s)";
+            document.getElementById("feedback").textContent = ui.success_word
+                ? "Acertou: " + ui.success_word
+                : (exercicio.feedback || "Aguardando sua proxima jogada.");
+            document.getElementById("mode-label").textContent = "Modo " + (exercicio.modo_jogo || "misto");
+            document.getElementById("difficulty").textContent = "Dificuldade " + (exercicio.dificuldade || "--");
+            document.getElementById("round").textContent = "Rodada " + ((exercicio.indice_palavra ?? 0) + 1) + "/" + (exercicio.total_palavras ?? 0);
+            document.getElementById("level").textContent = "Nivel " + (exercicio.nivel ?? "--");
+            document.getElementById("hint-badge").textContent = ui.show_hint ? "Dica ativada" : "Dica desativada";
+            const image = document.getElementById("challenge-image");
+            const text = document.getElementById("challenge-text");
+            if (ui.challenge_image) {
+                image.src = "data:image/jpeg;base64," + ui.challenge_image;
+                image.style.display = "block";
+                text.textContent = ui.show_hint && exercicio.dica ? "Dica: " + exercicio.dica : "Observe a imagem e sinalize a resposta.";
+            } else {
+                image.removeAttribute("src");
+                image.style.display = "none";
+                text.textContent = "Sem imagem nesta rodada";
+            }
+        }
+        document.addEventListener("keydown", (event) => {
+            const key = event.key.toLowerCase();
+            if (event.key === " ") { event.preventDefault(); action("confirmar_letra"); }
+            if (key === "c") action("limpar_palavra");
+            if (key === "r") action("reiniciar_exercicio");
+            if (key === "n") action("proxima_palavra");
+            if (key === "f") setMode("fotos");
+            if (key === "p") setMode("palavras");
+            if (key === "m") setMode("misto");
+            if (key === "h" || event.key === "4") toggleHint();
+            if (event.key === "1") setDifficulty("facil");
+            if (event.key === "2") setDifficulty("medio");
+            if (event.key === "3") setDifficulty("dificil");
+            if (event.key === "Escape") window.pywebview.api.close();
+        });
+        function signalReady() {
+            if (window.pywebview && window.pywebview.api) {
+                window.pywebview.api.ready();
+                return;
+            }
+            setTimeout(signalReady, 50);
+        }
+        window.addEventListener("pywebviewready", signalReady);
+        setTimeout(signalReady, 0);
+    </script>
+</body>
+</html>
+""".replace("__FLOATING_HANDS_CSS__", get_floating_hands_css()).replace(
+        "__FLOATING_HANDS_MARKUP__", get_floating_hands_markup()
+    )
+
+
+class ExerciseApi:
+    def __init__(self):
+        self.actions = queue.Queue()
+        self.window = None
+        self.closed = False
+        self.ready_for_frames = False
+        self.show_hint = False
+
+    def ready(self):
+        self.ready_for_frames = True
+
+    def action(self, payload):
+        self.actions.put(dict(payload or {}))
+
+    def toggle_hint(self):
+        self.show_hint = not self.show_hint
+
+    def close(self):
+        self.closed = True
+        if self.window:
+            self.window.destroy()
+
+
+async def process_webview_actions(websocket, api):
+    while True:
+        try:
+            payload = api.actions.get_nowait()
+        except queue.Empty:
+            return
+
+        await send_action(websocket, payload)
+        if payload.get("acao") in {
+            "reiniciar_exercicio",
+            "proxima_palavra",
+            "definir_dificuldade",
+            "definir_modo_jogo",
+        }:
+            api.show_hint = False
+
+
+async def open_websocket_with_retry(api, timeout_seconds=10.0):
+    deadline = time.monotonic() + timeout_seconds
+    last_error = None
+
+    while not api.closed:
+        try:
+            connection = connect(SERVER_URL, max_size=2**22)
+            websocket = await connection.__aenter__()
+            return connection, websocket
+        except Exception as exc:
+            last_error = exc
+            if time.monotonic() >= deadline:
+                break
+            await asyncio.sleep(0.35)
+
+    if last_error is not None:
+        raise last_error
+    raise RuntimeError("Janela fechada antes da conexao com o servidor")
+
+
+async def run_webview_exercises(window, api):
+    while not api.ready_for_frames and not api.closed:
+        await asyncio.sleep(0.05)
+    if api.closed:
+        return
+
+    camera = cv2.VideoCapture(0, cv2.CAP_DSHOW)
+    if not camera.isOpened():
+        raise RuntimeError("Erro ao acessar webcam local")
+
+    initial_game_mode = get_initial_game_mode()
+    current_image_path = None
+    current_image_frame = None
+    last_success_word = ""
+    success_visible_until = 0.0
+    last_ui_update = 0.0
+
+    try:
+        connection, websocket = await open_websocket_with_retry(api)
+        try:
+            if initial_game_mode != "misto":
+                await send_action(websocket, {"acao": "definir_modo_jogo", "modo_jogo": initial_game_mode})
+
+            while not api.closed:
+                ok, frame = camera.read()
+                if not ok:
+                    raise RuntimeError("Erro ao capturar frame da webcam")
+
+                await websocket.send(json.dumps({"frame": encode_frame(frame)}))
+                response = json.loads(await websocket.recv())
+                if response.get("tipo") == "erro":
+                    raise RuntimeError(response.get("mensagem", "Erro desconhecido do servidor"))
+
+                estado = response.get("estado", {})
+                exercicio = response.get("exercicio", {})
+                tipo_desafio = exercicio.get("tipo_desafio", "palavra")
+                imagem_caminho = exercicio.get("imagem_caminho", "")
+                ultima_concluida = exercicio.get("ultima_palavra_concluida", "")
+
+                if ultima_concluida and ultima_concluida != last_success_word:
+                    last_success_word = ultima_concluida
+                    success_visible_until = time.monotonic() + 1.75
+                success_word = last_success_word if time.monotonic() < success_visible_until else ""
+
+                if tipo_desafio == "imagem" and imagem_caminho:
+                    resolved_image_path = (PROJECT_ROOT / imagem_caminho).resolve()
+                    if current_image_path != resolved_image_path:
+                        challenge_image = cv2.imread(str(resolved_image_path))
+                        current_image_path = resolved_image_path
+                        current_image_frame = None
+                        if challenge_image is not None:
+                            current_image_frame = fit_image(challenge_image, 520, 520)
+                else:
+                    current_image_path = None
+                    current_image_frame = None
+
+                challenge_image_b64 = (
+                    encode_frame(current_image_frame, quality=78)
+                    if current_image_frame is not None
+                    else ""
+                )
+                camera_image = encode_frame(cv2.resize(frame, (640, 480)), quality=68)
+                ui_state = {
+                    "show_hint": api.show_hint,
+                    "success_word": success_word,
+                    "challenge_image": challenge_image_b64,
+                }
+                now = time.monotonic()
+                if now - last_ui_update >= 0.08:
+                    window.evaluate_js(
+                        "window.updateGame("
+                        + json.dumps(camera_image)
+                        + ", "
+                        + json.dumps(estado)
+                        + ", "
+                        + json.dumps(exercicio)
+                        + ", "
+                        + json.dumps(ui_state)
+                        + ");"
+                    )
+                    last_ui_update = now
+                await process_webview_actions(websocket, api)
+                await asyncio.sleep(0.01)
+        finally:
+            await connection.__aexit__(None, None, None)
+    finally:
+        api.closed = True
+        camera.release()
+
+
+def start_webview_exercises(window, api):
+    try:
+        asyncio.run(run_webview_exercises(window, api))
+    except Exception as exc:
+        print(f"Erro na interface HTML dos exercicios: {exc}")
+        api.closed = True
+
+
+def run_webview_app():
+    api = ExerciseApi()
+    window = webview.create_window(
+        WINDOW_NAME,
+        html=build_exercise_html(),
+        js_api=api,
+        width=1220,
+        height=760,
+        resizable=True,
+    )
+    api.window = window
+    window.events.closed += lambda: setattr(api, "closed", True)
+    webview.start(start_webview_exercises, (window, api), debug=False)
+
+
 async def send_action(websocket, payload):
     await websocket.send(json.dumps(payload))
     response = json.loads(await websocket.recv())
@@ -417,7 +907,7 @@ async def send_action(websocket, payload):
     return response
 
 
-async def main():
+async def run_cv2_exercises():
     camera = cv2.VideoCapture(0, cv2.CAP_DSHOW)
     if not camera.isOpened():
         raise RuntimeError("Erro ao acessar webcam local")
@@ -535,5 +1025,14 @@ async def main():
         cv2.destroyAllWindows()
 
 
+def main():
+    if webview is not None:
+        run_webview_app()
+        return
+
+    print("pywebview nao esta instalado; abrindo exercicios com interface antiga em OpenCV.")
+    asyncio.run(run_cv2_exercises())
+
+
 if __name__ == "__main__":
-    asyncio.run(main())
+    main()
