@@ -728,31 +728,31 @@ def build_exercise_html() -> str:
 
 class ExerciseApi:
     def __init__(self):
-        self.actions = queue.Queue()
-        self.window = None
-        self.closed = False
-        self.ready_for_frames = False
-        self.show_hint = False
+        self._actions = queue.Queue()
+        self._window = None
+        self._closed = False
+        self._ready_for_frames = False
+        self._show_hint = False
 
     def ready(self):
-        self.ready_for_frames = True
+        self._ready_for_frames = True
 
     def action(self, payload):
-        self.actions.put(dict(payload or {}))
+        self._actions.put(dict(payload or {}))
 
     def toggle_hint(self):
-        self.show_hint = not self.show_hint
+        self._show_hint = not self._show_hint
 
     def close(self):
-        self.closed = True
-        if self.window:
-            self.window.destroy()
+        self._closed = True
+        if self._window:
+            self._window.destroy()
 
 
 async def process_webview_actions(websocket, api):
     while True:
         try:
-            payload = api.actions.get_nowait()
+            payload = api._actions.get_nowait()
         except queue.Empty:
             return
 
@@ -763,14 +763,14 @@ async def process_webview_actions(websocket, api):
             "definir_dificuldade",
             "definir_modo_jogo",
         }:
-            api.show_hint = False
+            api._show_hint = False
 
 
 async def open_websocket_with_retry(api, timeout_seconds=10.0):
     deadline = time.monotonic() + timeout_seconds
     last_error = None
 
-    while not api.closed:
+    while not api._closed:
         try:
             connection = connect(SERVER_URL, max_size=2**22)
             websocket = await connection.__aenter__()
@@ -787,9 +787,9 @@ async def open_websocket_with_retry(api, timeout_seconds=10.0):
 
 
 async def run_webview_exercises(window, api):
-    while not api.ready_for_frames and not api.closed:
+    while not api._ready_for_frames and not api._closed:
         await asyncio.sleep(0.05)
-    if api.closed:
+    if api._closed:
         return
 
     camera = cv2.VideoCapture(0, cv2.CAP_DSHOW)
@@ -809,7 +809,7 @@ async def run_webview_exercises(window, api):
             if initial_game_mode != "misto":
                 await send_action(websocket, {"acao": "definir_modo_jogo", "modo_jogo": initial_game_mode})
 
-            while not api.closed:
+            while not api._closed:
                 ok, frame = camera.read()
                 if not ok:
                     raise RuntimeError("Erro ao capturar frame da webcam")
@@ -849,7 +849,7 @@ async def run_webview_exercises(window, api):
                 )
                 camera_image = encode_frame(cv2.resize(frame, (640, 480)), quality=68)
                 ui_state = {
-                    "show_hint": api.show_hint,
+                    "show_hint": api._show_hint,
                     "success_word": success_word,
                     "challenge_image": challenge_image_b64,
                 }
@@ -872,7 +872,7 @@ async def run_webview_exercises(window, api):
         finally:
             await connection.__aexit__(None, None, None)
     finally:
-        api.closed = True
+        api._closed = True
         camera.release()
 
 
@@ -881,7 +881,7 @@ def start_webview_exercises(window, api):
         asyncio.run(run_webview_exercises(window, api))
     except Exception as exc:
         print(f"Erro na interface HTML dos exercicios: {exc}")
-        api.closed = True
+        api._closed = True
 
 
 def run_webview_app():
@@ -894,8 +894,8 @@ def run_webview_app():
         height=760,
         resizable=True,
     )
-    api.window = window
-    window.events.closed += lambda: setattr(api, "closed", True)
+    api._window = window
+    window.events.closed += lambda: setattr(api, "_closed", True)
     webview.start(start_webview_exercises, (window, api), debug=False)
 
 

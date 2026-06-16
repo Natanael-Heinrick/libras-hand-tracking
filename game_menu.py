@@ -576,7 +576,7 @@ def build_menu_html() -> str:
 
 class MenuApi:
     def __init__(self):
-        self.window = None
+        self._window = None
 
     def launch(self, index):
         button_idx = int(index)
@@ -584,8 +584,8 @@ class MenuApi:
             launch_button(BUTTONS[button_idx])
 
     def close(self):
-        if self.window:
-            self.window.destroy()
+        if self._window:
+            self._window.destroy()
 
 
 def run_webview_menu():
@@ -598,7 +598,7 @@ def run_webview_menu():
         height=680,
         resizable=True,
     )
-    api.window = window
+    api._window = window
     webview.start(debug=False)
 
 

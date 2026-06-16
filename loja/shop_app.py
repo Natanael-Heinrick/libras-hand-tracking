@@ -393,99 +393,102 @@ def build_shop_html() -> str:
 
 class ShopApi:
     def __init__(self):
-        self.selected_index = 0
-        self.feedback = "Loja pronta. Seus looks foram carregados e os pontos infinitos estao ativos para teste."
+        self._selected_index = 0
+        self._feedback = "Loja pronta. Seus looks foram carregados e os pontos infinitos estao ativos para teste."
+        self._window = None
         sync_shop_catalog()
 
     def snapshot(self):
         items = load_shop_items()
         state = load_state()
-        if self.selected_index >= len(items):
-            self.selected_index = 0
-        selected_item = items[self.selected_index] if items else {}
+        if self._selected_index >= len(items):
+            self._selected_index = 0
+        selected_item = items[self._selected_index] if items else {}
         return {
             "items": items,
             "state": state,
-            "selected_index": self.selected_index,
+            "selected_index": self._selected_index,
             "selected_item": selected_item,
             "preview": shop_image_data_url(selected_item),
             "points": get_points_label(),
-            "feedback": self.feedback,
+            "feedback": self._feedback,
         }
 
     def select(self, index):
         items = load_shop_items()
         if items:
-            self.selected_index = max(0, min(int(index), len(items) - 1))
+            self._selected_index = max(0, min(int(index), len(items) - 1))
         return self.snapshot()
 
     def previous(self):
         items = load_shop_items()
         if items:
-            self.selected_index = (self.selected_index - 1) % len(items)
+            self._selected_index = (self._selected_index - 1) % len(items)
         return self.snapshot()
 
     def next(self):
         items = load_shop_items()
         if items:
-            self.selected_index = (self.selected_index + 1) % len(items)
+            self._selected_index = (self._selected_index + 1) % len(items)
         return self.snapshot()
 
     def refresh(self):
         sync_shop_catalog()
-        self.feedback = "Catalogo atualizado com os arquivos da pasta."
+        self._feedback = "Catalogo atualizado com os arquivos da pasta."
         return self.snapshot()
 
     def buy(self):
         items = load_shop_items()
         if not items:
-            self.feedback = "Nenhum look disponivel."
+            self._feedback = "Nenhum look disponivel."
             return self.snapshot()
         state = load_state()
-        selected_item = items[self.selected_index]
+        selected_item = items[self._selected_index]
         owned_items = state.get("owned_items", [])
         if selected_item["id"] in owned_items:
-            self.feedback = "Esse look ja foi comprado."
+            self._feedback = "Esse look ja foi comprado."
             return self.snapshot()
         success, _ = spend_points(selected_item["price"])
         if not success:
-            self.feedback = "Pontos insuficientes para comprar esse look."
+            self._feedback = "Pontos insuficientes para comprar esse look."
             return self.snapshot()
         state = load_state()
         state["owned_items"] = owned_items + [selected_item["id"]]
         save_state(state)
-        self.feedback = f"Compra concluida: {selected_item['name']}."
+        self._feedback = f"Compra concluida: {selected_item['name']}."
         return self.snapshot()
 
     def equip(self):
         items = load_shop_items()
         if not items:
-            self.feedback = "Nenhum look disponivel."
+            self._feedback = "Nenhum look disponivel."
             return self.snapshot()
         state = load_state()
-        selected_item = items[self.selected_index]
+        selected_item = items[self._selected_index]
         if selected_item["id"] not in state.get("owned_items", []):
-            self.feedback = "Compre o look antes de equipar."
+            self._feedback = "Compre o look antes de equipar."
             return self.snapshot()
         state["equipped_item"] = selected_item["id"]
         save_state(state)
-        self.feedback = f"Look equipado: {selected_item['name']}."
+        self._feedback = f"Look equipado: {selected_item['name']}."
         return self.snapshot()
 
     def close(self):
-        if webview.windows:
-            webview.windows[0].destroy()
+        if self._window:
+            self._window.destroy()
 
 
 def run_webview_app():
-    webview.create_window(
+    api = ShopApi()
+    window = webview.create_window(
         WINDOW_NAME,
         html=build_shop_html(),
-        js_api=ShopApi(),
+        js_api=api,
         width=1180,
         height=720,
         resizable=True,
     )
+    api._window = window
     webview.start(debug=False)
 
 

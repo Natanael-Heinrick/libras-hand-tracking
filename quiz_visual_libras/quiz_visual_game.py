@@ -456,17 +456,17 @@ def build_quiz_html() -> str:
 
 class QuizApi:
     def __init__(self):
-        self.actions = queue.Queue()
-        self.window = None
-        self.closed = False
+        self._actions = queue.Queue()
+        self._window = None
+        self._closed = False
 
     def action(self, payload):
-        self.actions.put(dict(payload or {}))
+        self._actions.put(dict(payload or {}))
 
     def close(self):
-        self.closed = True
-        if self.window:
-            self.window.destroy()
+        self._closed = True
+        if self._window:
+            self._window.destroy()
 
 
 def run_webview_quiz_loop(window, api):
@@ -488,7 +488,7 @@ def run_webview_quiz_loop(window, api):
     last_switch = time.monotonic()
     clear_answer = False
 
-    while not api.closed:
+    while not api._closed:
         challenge = challenges[challenge_index]
         if stage == "preview" and time.monotonic() - last_switch >= DISPLAY_SECONDS_PER_LETTER:
             sequence_index += 1
@@ -501,7 +501,7 @@ def run_webview_quiz_loop(window, api):
 
         while True:
             try:
-                payload = api.actions.get_nowait()
+                payload = api._actions.get_nowait()
             except queue.Empty:
                 break
 
@@ -572,7 +572,7 @@ def start_webview_quiz(window, api):
         run_webview_quiz_loop(window, api)
     except Exception as exc:
         print(f"Erro na interface HTML do quiz visual: {exc}")
-        api.closed = True
+        api._closed = True
 
 
 def run_webview_app():
@@ -585,8 +585,8 @@ def run_webview_app():
         height=720,
         resizable=True,
     )
-    api.window = window
-    window.events.closed += lambda: setattr(api, "closed", True)
+    api._window = window
+    window.events.closed += lambda: setattr(api, "_closed", True)
     webview.start(start_webview_quiz, (window, api), debug=False)
 
 

@@ -647,27 +647,27 @@ def build_camera_html() -> str:
 
 class CameraApi:
     def __init__(self):
-        self.actions = queue.Queue()
-        self.window = None
-        self.closed = False
-        self.last_word = ""
+        self._actions = queue.Queue()
+        self._window = None
+        self._closed = False
+        self._last_word = ""
 
     def action(self, action_name):
-        self.actions.put(str(action_name))
+        self._actions.put(str(action_name))
 
     def speak(self):
-        falar_texto(self.last_word)
+        falar_texto(self._last_word)
 
     def close(self):
-        self.closed = True
-        if self.window:
-            self.window.destroy()
+        self._closed = True
+        if self._window:
+            self._window.destroy()
 
 
 async def process_webview_actions(websocket, api):
     while True:
         try:
-            action_name = api.actions.get_nowait()
+            action_name = api._actions.get_nowait()
         except queue.Empty:
             return
 
@@ -685,7 +685,7 @@ async def run_webview_tracking(window, api):
 
     try:
         async with connect(SERVER_URL, max_size=2**22) as websocket:
-            while not api.closed:
+            while not api._closed:
                 ok, frame = camera.read()
                 if not ok:
                     raise RuntimeError("Erro ao capturar frame da webcam")
@@ -699,7 +699,7 @@ async def run_webview_tracking(window, api):
                     )
 
                 estado = response.get("estado", {})
-                api.last_word = estado.get("palavra", "")
+                api._last_word = estado.get("palavra", "")
                 camera_image = encode_frame(cv2.resize(frame, (640, 480)), quality=68)
                 window.evaluate_js(
                     f"window.updateFrame('{camera_image}', {json.dumps(estado)});"
@@ -707,7 +707,7 @@ async def run_webview_tracking(window, api):
                 await process_webview_actions(websocket, api)
                 await asyncio.sleep(0.02)
     finally:
-        api.closed = True
+        api._closed = True
         camera.release()
 
 
@@ -716,7 +716,7 @@ def start_webview_tracking(window, api):
         asyncio.run(run_webview_tracking(window, api))
     except Exception as exc:
         print(f"Erro na interface HTML da camera: {exc}")
-        api.closed = True
+        api._closed = True
 
 
 async def run_cv2_tracking():
@@ -781,8 +781,8 @@ def run_webview_app():
         height=720,
         resizable=True,
     )
-    api.window = window
-    window.events.closed += lambda: setattr(api, "closed", True)
+    api._window = window
+    window.events.closed += lambda: setattr(api, "_closed", True)
     webview.start(start_webview_tracking, (window, api), debug=False)
 
 

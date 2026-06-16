@@ -898,49 +898,49 @@ def build_duel_html() -> str:
 
 class DuelApi:
     def __init__(self):
-        self.actions = queue.Queue()
-        self.window = None
-        self.closed = False
-        self.player_names = None
+        self._actions = queue.Queue()
+        self._window = None
+        self._closed = False
+        self._player_names = None
 
     def set_names(self, player_one, player_two):
-        self.player_names = {
+        self._player_names = {
             PLAYER_ONE_ID: normalize_player_name(player_one, "Jogador 1"),
             PLAYER_TWO_ID: normalize_player_name(player_two, "Jogador 2"),
         }
 
     def action(self, action_name):
-        self.actions.put(str(action_name))
+        self._actions.put(str(action_name))
 
     def close(self):
-        self.closed = True
-        if self.window:
-            self.window.destroy()
+        self._closed = True
+        if self._window:
+            self._window.destroy()
 
 
 async def process_duel_webview_actions(websocket, api):
     while True:
         try:
-            action_name = api.actions.get_nowait()
+            action_name = api._actions.get_nowait()
         except queue.Empty:
             return
         await send_action(websocket, action_name)
 
 
 async def run_webview_duel(window, api):
-    while api.player_names is None and not api.closed:
+    while api._player_names is None and not api._closed:
         await asyncio.sleep(0.05)
-    if api.closed:
+    if api._closed:
         return
 
-    player_names = api.player_names
+    player_names = api._player_names
     camera = cv2.VideoCapture(0, cv2.CAP_DSHOW)
     if not camera.isOpened():
         raise RuntimeError("Erro ao acessar webcam local")
 
     try:
         async with connect(SERVER_URL, max_size=2**22) as websocket:
-            while not api.closed:
+            while not api._closed:
                 ok, frame = camera.read()
                 if not ok:
                     raise RuntimeError("Erro ao capturar frame da webcam")
@@ -968,7 +968,7 @@ async def run_webview_duel(window, api):
                 await process_duel_webview_actions(websocket, api)
                 await asyncio.sleep(0.02)
     finally:
-        api.closed = True
+        api._closed = True
         camera.release()
 
 
@@ -977,7 +977,7 @@ def start_webview_duel(window, api):
         asyncio.run(run_webview_duel(window, api))
     except Exception as exc:
         print(f"Erro na interface HTML do duelo: {exc}")
-        api.closed = True
+        api._closed = True
 
 
 def run_webview_app():
@@ -990,8 +990,8 @@ def run_webview_app():
         height=760,
         resizable=True,
     )
-    api.window = window
-    window.events.closed += lambda: setattr(api, "closed", True)
+    api._window = window
+    window.events.closed += lambda: setattr(api, "_closed", True)
     webview.start(start_webview_duel, (window, api), debug=False)
 
 
