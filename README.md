@@ -1,232 +1,157 @@
-# Hand Tracking Project
+# LIBRAS Hand Tracking
 
-Projeto em Python para reconhecimento de letras e palavras em LIBRAS com duas frentes principais:
+Projeto desenvolvido para auxiliar o aprendizado de LIBRAS utilizando Visão Computacional, reconhecimento de gestos e jogos educativos.
 
-- hand tracking em tempo real com webcam, OpenCV, MediaPipe e WebSocket
-- soletracao por voz com servidor HTTP, tela web e exibicao de GIFs
+O sistema utiliza OpenCV, MediaPipe, WebSocket e PyWebView para fornecer diferentes modos de aprendizagem interativos.
 
-## Sumario
+## Funcionalidades
 
-- [Visao Geral](#visao-geral)
-- [Como Navegar na Documentacao](#como-navegar-na-documentacao)
-- [Execucao Rapida](#execucao-rapida)
-- [Execucao por Terminal](#execucao-por-terminal)
-- [Documentacao Detalhada](#documentacao-detalhada)
-- [Observacoes](#observacoes)
+* Reconhecimento de letras em LIBRAS em tempo real.
+* Exercícios com palavras e imagens.
+* Duelo local entre jogadores.
+* Quiz visual de letras.
+* Sistema de pontuação e loja virtual.
+* Soletração por voz.
+* Comunicação em tempo real utilizando WebSocket.
 
-## Visao Geral
-
-O projeto possui hoje dois fluxos principais:
-
-1. WebSocket + webcam para reconhecimento de letras e modo exercicios
-2. HTTP + navegador para soletracao por voz e exibicao de GIFs
-
-Este `README.md` agora funciona como ponto de entrada da documentacao. Os detalhes tecnicos foram separados para a pasta `docs/`.
-
-## Como Navegar na Documentacao
-
-Documentos disponiveis:
-
-- [API HTTP](/c:/Users/Natanael/OneDrive/Desktop/hand-tracking-project/docs/api.md)
-- [WebSocket](/c:/Users/Natanael/OneDrive/Desktop/hand-tracking-project/docs/websocket.md)
-- [Soletracao por Voz](/c:/Users/Natanael/OneDrive/Desktop/hand-tracking-project/docs/soletracao-voz.md)
-- [Modo Exercicios](/c:/Users/Natanael/OneDrive/Desktop/hand-tracking-project/docs/exercicios.md)
-- [Instalacao](/c:/Users/Natanael/OneDrive/Desktop/hand-tracking-project/docs/instalacao.md)
-- [Estrutura do Projeto](/c:/Users/Natanael/OneDrive/Desktop/hand-tracking-project/docs/estrutura-projeto.md)
-
-Cada documento dentro de `docs/` possui link de retorno para este `README.md`.
-
-## Execucao Rapida
-
-### Soletracao por voz
-
-```powershell
-python api_server.py
-```
-
-Depois abra:
+## Estrutura do Projeto
 
 ```text
-http://127.0.0.1:8000/soletracao-palavras/tela
+LIBRAS-HAND-TRACKING/
+│
+├── docs/
+│   ├── api.md
+│   ├── estrutura-projeto.md
+│   ├── exercicios.md
+│   ├── instalacao.md
+│   ├── soletracao-voz.md
+│   ├── validacao-maos.md
+│   └── websocket.md
+│
+├── duelo_libras/
+├── exercicios_libras/
+├── image/
+├── loja/
+├── quiz_visual_libras/
+├── soletracao_palavras/
+├── validacao_maos/
+├── voice_to_libras/
+│
+├── api_server.py
+├── game_menu.py
+├── hand_geometry.py
+├── hand_tracking_service.py
+├── hand_tracking.py
+├── letter_classifier.py
+├── test_camera.py
+├── ui_decor.py
+├── voice_to_libras_demo.py
+├── websocket_client.py
+├── websocket_duelo_client.py
+├── websocket_exercicios_client.py
+├── websocket_server.py
+├── README.md
+└── .gitignore
 ```
 
-### Modo alfabeto via WebSocket
+## Documentação Técnica
 
-Terminal 1:
+* [Instalação](docs/instalacao.md)
+* [API HTTP](docs/api.md)
+* [WebSocket](docs/websocket.md)
+* [Exercícios](docs/exercicios.md)
+* [Soletração por Voz](docs/soletracao-voz.md)
+* [Validação das Mãos](docs/validacao-maos.md)
+* [Estrutura do Projeto](docs/estrutura-projeto.md)
 
-```powershell
+## Instalação
+
+Para instalar o projeto, consulte:
+
+* [Guia de Instalação](docs/instalacao.md)
+
+## Execução
+
+### Iniciar o servidor WebSocket
+
+```bash
 python websocket_server.py
 ```
 
-Terminal 2:
+### Executar o reconhecimento de letras
 
-```powershell
+```bash
 python websocket_client.py
 ```
 
-### Modo exercicios via WebSocket
+### Executar o modo exercícios
 
-Terminal 1:
-
-```powershell
-python websocket_server.py
-```
-
-Terminal 2:
-
-```powershell
+```bash
 python websocket_exercicios_client.py
 ```
 
-## Execucao por Terminal
+### Executar o modo duelo
 
-### Terminal 1: servidor HTTP
+```bash
+python websocket_duelo_client.py
+```
 
-Arquivo:
+### Executar o menu principal
 
-- [api_server.py](/c:/Users/Natanael/OneDrive/Desktop/hand-tracking-project/api_server.py)
+```bash
+python game_menu.py
+```
 
-Comando:
+### Executar a API HTTP
 
-```powershell
+```bash
 python api_server.py
 ```
 
-Libera:
+### Testar a câmera
 
-- API HTTP local
-- tela web da soletracao
-- rotas de GIF, audio e status
-
-### Terminal 1: servidor WebSocket
-
-Arquivo:
-
-- [websocket_server.py](/c:/Users/Natanael/OneDrive/Desktop/hand-tracking-project/websocket_server.py)
-
-Comando:
-
-```powershell
-python websocket_server.py
-```
-
-Libera:
-
-- rota `/alfabeto`
-- rota `/exercicios`
-
-### Terminal 2: cliente do modo alfabeto
-
-Arquivo:
-
-- [websocket_client.py](/c:/Users/Natanael/OneDrive/Desktop/hand-tracking-project/websocket_client.py)
-
-Comando:
-
-```powershell
-python websocket_client.py
-```
-
-Depende de:
-
-- `websocket_server.py` ja estar em execucao
-
-### Terminal 2: cliente do modo exercicios
-
-Arquivo:
-
-- [websocket_exercicios_client.py](/c:/Users/Natanael/OneDrive/Desktop/hand-tracking-project/websocket_exercicios_client.py)
-
-Comando:
-
-```powershell
-python websocket_exercicios_client.py
-```
-
-Depende de:
-
-- `websocket_server.py` ja estar em execucao
-
-### Terminal auxiliar: teste de webcam
-
-Arquivo:
-
-- [test_camera.py](/c:/Users/Natanael/OneDrive/Desktop/hand-tracking-project/test_camera.py)
-
-Comando:
-
-```powershell
+```bash
 python test_camera.py
 ```
 
-## Documentacao Detalhada
+## Modos Disponíveis
 
-### API HTTP
+### Fotos
 
-Use este documento para consultar:
+Mostra imagens de objetos e o usuário deve soletrar corretamente o nome utilizando LIBRAS.
 
-- rotas HTTP
-- porta
-- endpoints de soletracao
-- tela web
+### Palavras
 
-Link:
+Treino tradicional utilizando palavras selecionadas aleatoriamente.
 
-- [docs/api.md](/c:/Users/Natanael/OneDrive/Desktop/hand-tracking-project/docs/api.md)
+### Imagens de Letras
 
-### WebSocket
+Exibe imagens das configurações das mãos para identificação das letras correspondentes.
 
-Use este documento para consultar:
+### Loja
 
-- rotas `/alfabeto` e `/exercicios`
-- clientes
-- fluxo em tempo real
+Permite utilizar os pontos conquistados durante os exercícios para desbloquear itens.
 
-Link:
+### Duelo de Tempo
 
-- [docs/websocket.md](/c:/Users/Natanael/OneDrive/Desktop/hand-tracking-project/docs/websocket.md)
+Competição local entre dois jogadores utilizando a mesma câmera.
 
-### Soletracao por Voz
+### Voz para LIBRAS
 
-Use este documento para consultar:
+Converte palavras faladas em representações visuais em LIBRAS.
 
-- fluxo HTTP
-- GIFs
-- audios
-- tela de teste
+## Tecnologias Utilizadas
 
-Link:
+* Python
+* OpenCV
+* MediaPipe
+* NumPy
+* WebSocket
+* PyWebView
+* HTML
+* CSS
+* JavaScript
 
-- [docs/soletracao-voz.md](/c:/Users/Natanael/OneDrive/Desktop/hand-tracking-project/docs/soletracao-voz.md)
+## Objetivo
 
-### Modo Exercicios
-
-Use este documento para consultar:
-
-- CSV de palavras
-- pontuacao
-- dificuldade
-- nivel
-- selecao aleatoria
-
-Link:
-
-- [docs/exercicios.md](/c:/Users/Natanael/OneDrive/Desktop/hand-tracking-project/docs/exercicios.md)
-
-### Instalacao
-
-Link:
-
-- [docs/instalacao.md](/c:/Users/Natanael/OneDrive/Desktop/hand-tracking-project/docs/instalacao.md)
-
-### Estrutura do Projeto
-
-Link:
-
-- [docs/estrutura-projeto.md](/c:/Users/Natanael/OneDrive/Desktop/hand-tracking-project/docs/estrutura-projeto.md)
-
-## Observacoes
-
-- Este bloco 1 cria a base da pasta `docs/`.
-- O `README.md` da raiz agora serve como hub principal.
-- Nos proximos blocos, cada documento em `docs/` pode ser expandido com mais detalhes tecnicos.
+Promover o ensino e a prática de LIBRAS através de tecnologias de Visão Computacional e jogos educativos interativos.
