@@ -1,215 +1,206 @@
 # 🛠️ Instalação
 
-[⬅️ Voltar para o README principal](/c:/Users/Natanael/OneDrive/Desktop/hand-tracking-project/README.md)
+[⬅️ Voltar para o README principal](../README.md)
 
-Este documento reúne os passos para preparar o ambiente e executar o projeto localmente.
+Este guia apresenta os passos necessários para configurar e executar o projeto localmente.
 
 ## 📋 Pré-requisitos
 
-Antes de instalar, verifique se você possui:
+Antes de iniciar, verifique se possui:
 
-- Python 3.11 ou superior
-- Windows com PowerShell
-- webcam funcional
-- navegador moderno para o fluxo HTTP
-- Chrome ou Edge para melhor suporte ao reconhecimento de fala no navegador
+* Python 3.11 ou superior
+* Sistema operacional Windows
+* Webcam funcional
+* Navegador moderno
+* Acesso ao PowerShell ou Terminal
 
-## 🐍 Verificar versão do Python
+## 🐍 Verificar a versão do Python
 
-No terminal:
+Abra o terminal e execute:
 
-```powershell
+```bash
 python --version
 ```
 
-Resultado esperado:
+Saída esperada:
 
 ```text
 Python 3.11.x
 ```
 
-## 📁 Estrutura esperada
-
-O projeto utiliza:
-
-- ambiente virtual local em `venv/`
-- cache Python em `__pycache__/`
-
-O `.gitignore` atual já ignora:
-
-- `venv/`
-- `__pycache__/`
-- `*.pyc`
-
-## 🔧 Criar o ambiente virtual
+## 📁 Criar o ambiente virtual
 
 No diretório raiz do projeto:
 
-```powershell
+```bash
 python -m venv venv
 ```
 
 ## ▶️ Ativar o ambiente virtual
 
-No PowerShell:
+### PowerShell
 
-```powershell
+```bash
 .\venv\Scripts\Activate.ps1
 ```
 
-Se o ambiente estiver ativo corretamente, o terminal normalmente passa a exibir algo como:
+### Git Bash
+
+```bash
+source venv/Scripts/activate
+```
+
+Quando ativado corretamente, o terminal exibirá:
 
 ```text
 (venv)
 ```
 
-## 📦 Instalar dependências
+## 📦 Instalar as dependências
 
-Instale as bibliotecas principais com:
+Instale as bibliotecas necessárias:
 
-```powershell
-pip install opencv-python mediapipe numpy websockets
+```bash
+pip install opencv-python mediapipe numpy websockets pywebview
 ```
 
-## 📚 Bibliotecas utilizadas
+## 📚 Bibliotecas Utilizadas
 
-Dependências principais:
-
-- `opencv-python`
-- `mediapipe`
-- `numpy`
-- `websockets`
+* `opencv-python`
+* `mediapipe`
+* `numpy`
+* `websockets`
+* `pywebview`
 
 ## ✅ Validar a instalação
 
-Depois da instalação, você pode validar rapidamente se o ambiente está pronto.
+Execute o teste abaixo:
 
-### Teste 1: importar bibliotecas
-
-```powershell
+```bash
 @'
 import cv2
 import mediapipe
 import numpy
 import websockets
-print("Ambiente OK")
+import webview
+
+print("Ambiente configurado com sucesso")
 '@ | python -
 ```
 
 Resultado esperado:
 
 ```text
-Ambiente OK
+Ambiente configurado com sucesso
 ```
 
-### Teste 2: testar webcam
+## 🎮 Executar o projeto
 
-```powershell
+### Abrir o menu principal
+
+```bash
+python game_menu.py
+```
+
+O menu abrirá utilizando o PyWebView. Caso a biblioteca não esteja instalada, o sistema utilizará automaticamente a interface baseada em OpenCV.
+
+### Iniciar o servidor WebSocket
+
+```bash
+python websocket_server.py
+```
+
+### Executar o modo Fotos
+
+```bash
+python websocket_exercicios_client.py fotos
+```
+
+### Executar o modo Palavras
+
+```bash
+python websocket_exercicios_client.py palavras
+```
+
+### Executar o modo Duelo
+
+```bash
+python websocket_duelo_client.py
+```
+
+### Executar o Quiz Visual
+
+```bash
+python -m quiz_visual_libras.quiz_visual_game
+```
+
+### Abrir a Loja
+
+```bash
+python -m loja.shop_app
+```
+
+## 📷 Testar a câmera
+
+Para verificar se a webcam está funcionando corretamente:
+
+```bash
 python test_camera.py
-```
-
-Se abrir a webcam corretamente, o ambiente está apto para os fluxos com câmera.
-
-## 🚀 Próximos passos após instalar
-
-Depois da instalação, você pode seguir um dos fluxos abaixo.
-
-### Fluxo HTTP de soletração por voz
-
-```powershell
-python api_server.py
-```
-
-Depois abra:
-
-```text
-http://127.0.0.1:8000/soletracao-palavras/tela
-```
-
-### Fluxo WebSocket do modo alfabeto
-
-Terminal 1:
-
-```powershell
-python websocket_server.py
-```
-
-Terminal 2:
-
-```powershell
-python websocket_client.py
-```
-
-### Fluxo WebSocket do modo exercícios
-
-Terminal 1:
-
-```powershell
-python websocket_server.py
-```
-
-Terminal 2:
-
-```powershell
-python websocket_exercicios_client.py
 ```
 
 ## ⚠️ Problemas comuns
 
-### 1. O PowerShell bloqueia a ativação do ambiente virtual
+### O ambiente virtual não ativa
 
-Se ocorrer erro de política de execução, você pode abrir o PowerShell como administrador e ajustar a política para o usuário atual:
+Execute no PowerShell como administrador:
 
-```powershell
-Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
+```bash
+Set-ExecutionPolicy RemoteSigned -Scope CurrentUser
 ```
 
-Depois tente ativar novamente:
+Em seguida:
 
-```powershell
+```bash
 .\venv\Scripts\Activate.ps1
 ```
 
-### 2. A webcam não abre
+### O menu não abre
 
-Tente:
+Verifique se o `pywebview` está instalado:
 
-- fechar outros aplicativos que estejam usando a câmera
-- testar com [test_camera.py](/c:/Users/Natanael/OneDrive/Desktop/hand-tracking-project/test_camera.py)
-- verificar permissões da câmera no Windows
-
-### 3. O navegador não reconhece voz
-
-Recomendações:
-
-- usar Chrome ou Edge
-- permitir acesso ao microfone
-- testar o fluxo em:
-
-```text
-http://127.0.0.1:8000/soletracao-palavras/tela
+```bash
+pip install pywebview
 ```
 
-### 4. O WebSocket não conecta
+### O WebSocket não conecta
 
 Verifique se:
 
-- `websocket_server.py` está rodando antes do cliente
-- a porta `8765` está livre
-- você está usando a rota correta
+* `websocket_server.py` está em execução.
+* A porta `8765` está disponível.
+* O servidor foi iniciado antes do cliente.
 
-### 5. A API HTTP não responde
+### A câmera não abre
 
-Verifique se:
+* Feche outros programas que utilizam a webcam.
+* Teste utilizando:
 
-- `api_server.py` está rodando
-- a porta `8000` está livre
-- você acessou a URL correta no navegador
+```bash
+python test_camera.py
+```
+
+* Verifique as permissões de câmera do sistema operacional.
 
 ## 📝 Observações
 
-- O projeto ainda não possui `requirements.txt`
-- Atualmente a instalação é feita manualmente via `pip install`
-- Como melhoria futura, vale gerar um `requirements.txt` para padronizar o ambiente
+Recomenda-se gerar um arquivo `requirements.txt` para facilitar futuras instalações:
 
-[⬅️ Voltar para o README principal](/c:/Users/Natanael/OneDrive/Desktop/hand-tracking-project/README.md)
+```bash
+pip freeze > requirements.txt
+```
+
+Para instalar todas as dependências posteriormente:
+
+```bash
+pip install -r requirements.txt
+```
